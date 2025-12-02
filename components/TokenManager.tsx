@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { Id } from '../convex/_generated/dataModel';
-import { TokenType, ConvexToken, convexActivityToLegacy } from '../types';
+import { TokenType, ConvexToken, convexActivityToLegacy, convexTokenToLegacy } from '../types';
 import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Moon, Layers, ChevronDown, Activity, X } from 'lucide-react';
+import { TokenExport } from './TokenExport';
 
 const TABS: { id: TokenType; label: string }[] = [
     { id: 'color', label: 'Colors' },
@@ -23,6 +24,7 @@ export const TokenManager: React.FC = () => {
     const [density, setDensity] = useState<'1x' | '2x' | '3x'>('1x');
     const [isDarkModePreview, setIsDarkModePreview] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [newToken, setNewToken] = useState({ name: '', value: '', description: '' });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -235,7 +237,7 @@ export const TokenManager: React.FC = () => {
                             <Upload size={14} /> Import JSON
                         </button>
                         <button 
-                            onClick={handleDownload}
+                            onClick={() => setShowExportModal(true)}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary bg-surface border border-border rounded hover:bg-surface/80"
                         >
                             <Download size={14} /> Export
@@ -494,6 +496,13 @@ export const TokenManager: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Export Modal */}
+            <TokenExport 
+                tokens={(tokens || []).map(convexTokenToLegacy)} 
+                isOpen={showExportModal} 
+                onClose={() => setShowExportModal(false)} 
+            />
         </div>
     );
 };
