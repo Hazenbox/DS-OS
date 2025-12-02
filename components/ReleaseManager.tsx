@@ -1,7 +1,8 @@
-
 import React, { useState } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
 import { ComponentItem, DeploymentStatus } from '../types';
-import { CheckCircle, Circle, AlertCircle, Loader2, Play } from 'lucide-react';
+import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package } from 'lucide-react';
 
 interface ReleaseManagerProps {
     components: ComponentItem[];
@@ -10,40 +11,100 @@ interface ReleaseManagerProps {
 export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) => {
     const [activeDeploy, setActiveDeploy] = useState<DeploymentStatus[] | null>(null);
 
-    const startRelease = () => {
+    // Convex queries
+    const releases = useQuery(api.releases.list, {});
+    const latestRelease = useQuery(api.releases.latest, {});
+
+    // Convex mutations
+    const createRelease = useMutation(api.releases.create);
+    const updateReleaseStatus = useMutation(api.releases.updateStatus);
+    const logActivity = useMutation(api.activity.create);
+
+    const pendingComponents = components.filter(c => c.status !== 'stable' && c.status !== 'deprecated');
+
+    const startRelease = async () => {
         const steps: DeploymentStatus['step'][] = ['lint', 'test', 'build', 'docs', 'publish'];
         const initialStatus: DeploymentStatus[] = steps.map(s => ({ step: s, status: 'pending' }));
         setActiveDeploy(initialStatus);
 
-        // Simulate process
-        let currentStep = 0;
-        const interval = setInterval(() => {
-            if (currentStep >= steps.length) {
-                clearInterval(interval);
-                return;
-            }
+        // Calculate next version
+        const currentVersion = latestRelease?.version || '0.0.0';
+        const [major, minor, patch] = currentVersion.replace('v', '').split('.').map(Number);
+        const newVersion = `v${major}.${minor + 1}.0`;
 
-            setActiveDeploy(prev => {
-                if (!prev) return null;
-                const newStatus = [...prev];
-                // Set current to running
-                newStatus[currentStep].status = 'running';
-                // Set previous to success
-                if (currentStep > 0) newStatus[currentStep - 1].status = 'success';
-                return newStatus;
+        // Create release record
+        try {
+            const releaseId = await createRelease({
+                version: newVersion,
+                changelog: generateChangelog(components),
+                components: components.map(c => c.id),
             });
 
-            setTimeout(() => {
+            // Simulate process
+            let currentStep = 0;
+            const interval = setInterval(() => {
+                if (currentStep >= steps.length) {
+                    clearInterval(interval);
+                    // Mark release as published
+                    updateReleaseStatus({ id: releaseId, status: 'published' });
+                    return;
+                }
+
                 setActiveDeploy(prev => {
                     if (!prev) return null;
                     const newStatus = [...prev];
-                    newStatus[currentStep].status = 'success';
+                    newStatus[currentStep].status = 'running';
+                    if (currentStep > 0) newStatus[currentStep - 1].status = 'success';
                     return newStatus;
                 });
-                currentStep++;
-            }, 1500);
 
-        }, 2000);
+                setTimeout(() => {
+                    setActiveDeploy(prev => {
+                        if (!prev) return null;
+                        const newStatus = [...prev];
+                        newStatus[currentStep].status = 'success';
+                        return newStatus;
+                    });
+                    currentStep++;
+                }, 1500);
+
+            }, 2000);
+        } catch (error) {
+            console.error('Failed to create release:', error);
+        }
+    };
+
+    const generateChangelog = (comps: ComponentItem[]) => {
+        const stable = comps.filter(c => c.status === 'stable');
+        const review = comps.filter(c => c.status === 'review');
+        const draft = comps.filter(c => c.status === 'draft');
+        
+        let changelog = '## Changes\n\n';
+        
+        if (stable.length > 0) {
+            changelog += '### Stable\n';
+            stable.forEach(c => {
+                changelog += `- ${c.name} v${c.version}\n`;
+            });
+            changelog += '\n';
+        }
+        
+        if (review.length > 0) {
+            changelog += '### In Review\n';
+            review.forEach(c => {
+                changelog += `- ${c.name} v${c.version}\n`;
+            });
+            changelog += '\n';
+        }
+        
+        if (draft.length > 0) {
+            changelog += '### Draft\n';
+            draft.forEach(c => {
+                changelog += `- ${c.name} v${c.version}\n`;
+            });
+        }
+        
+        return changelog;
     };
 
     const getStatusIcon = (status: DeploymentStatus['status']) => {
@@ -55,6 +116,12 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
         }
     };
 
+    const nextVersion = () => {
+        const currentVersion = latestRelease?.version || 'v0.0.0';
+        const [major, minor, patch] = currentVersion.replace('v', '').split('.').map(Number);
+        return `v${major}.${minor + 1}.0`;
+    };
+
     return (
         <div className="flex flex-col h-full">
             <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
@@ -62,7 +129,10 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                     <h2 className="text-xl font-semibold text-primary">Release</h2>
                     <p className="text-sm text-muted">Orchestrate package publishing to NPM and documentation.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                    <span className="text-xs text-muted font-mono">
+                        Next: {nextVersion()}
+                    </span>
                     <button 
                         onClick={startRelease}
                         disabled={!!activeDeploy && activeDeploy.some(s => s.status === 'running')}
@@ -106,20 +176,54 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                         )}
                     </div>
 
+                    {/* Release History */}
+                    {releases && releases.length > 0 && (
+                        <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/5">
+                                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                                    <Package size={14} /> Release History
+                                </h3>
+                            </div>
+                            <div className="divide-y divide-border">
+                                {releases.slice(0, 5).map(release => (
+                                    <div key={release._id} className="px-6 py-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-mono font-medium text-primary">{release.version}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded ${
+                                                release.status === 'published' ? 'bg-green-500/10 text-green-600' :
+                                                release.status === 'in_progress' ? 'bg-yellow-500/10 text-yellow-600' :
+                                                release.status === 'failed' ? 'bg-red-500/10 text-red-600' :
+                                                'bg-zinc-500/10 text-zinc-600'
+                                            }`}>
+                                                {release.status}
+                                            </span>
+                                        </div>
+                                        <span className="text-xs text-muted">
+                                            {release.publishedAt 
+                                                ? new Date(release.publishedAt).toLocaleDateString()
+                                                : 'Pending'
+                                            }
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg overflow-hidden">
                         <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/5">
                             <h3 className="text-sm font-semibold text-primary">Changelog Preview</h3>
                         </div>
                         <div className="p-6 font-mono text-sm text-muted space-y-2">
-                            <p className="text-primary font-bold">## v2.5.0 (Upcoming)</p>
+                            <p className="text-primary font-bold">## {nextVersion()} (Upcoming)</p>
                             <p>### Features</p>
                             <ul className="list-disc pl-4 space-y-1">
-                                {components.filter(c => c.status !== 'stable').map(c => (
+                                {pendingComponents.map(c => (
                                     <li key={c.id}>
-                                        <span className="text-accent">{c.name}</span>: Promoted to {c.status}
+                                        <span className="text-accent">{c.name}</span>: {c.status} → stable
                                     </li>
                                 ))}
-                                {components.filter(c => c.status !== 'stable').length === 0 && <li>No pending changes</li>}
+                                {pendingComponents.length === 0 && <li>No pending changes</li>}
                             </ul>
                         </div>
                     </div>

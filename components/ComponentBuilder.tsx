@@ -1,31 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { ComponentItem, Token } from '../types';
+import React, { useState } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
+import { Id } from '../convex/_generated/dataModel';
+import { Token, ConvexComponent } from '../types';
 import { generateComponentCode, generateDocumentation } from '../services/geminiService';
-import { Send, Zap, Code, FileText, Loader2, Play } from 'lucide-react';
+import { Send, Zap, Code, FileText, Loader2, Trash2 } from 'lucide-react';
 
 interface BuilderProps {
-    components: ComponentItem[];
-    setComponents: React.Dispatch<React.SetStateAction<ComponentItem[]>>;
     tokens: Token[];
 }
 
-export const ComponentBuilder: React.FC<BuilderProps> = ({ components, setComponents, tokens }) => {
-    const [selectedComponent, setSelectedComponent] = useState<ComponentItem | null>(null);
+export const ComponentBuilder: React.FC<BuilderProps> = ({ tokens }) => {
+    const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
     const [prompt, setPrompt] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'docs'>('code');
 
-    const handleCreateNew = () => {
-        const newComp: ComponentItem = {
-            id: Date.now().toString(),
-            name: 'New Component',
-            status: 'draft',
-            version: '0.0.1',
-            code: '// Generated code will appear here',
-            docs: 'Documentation pending...'
-        };
-        setComponents([...components, newComp]);
-        setSelectedComponent(newComp);
+    // Convex queries
+    const components = useQuery(api.components.list, {});
+
+    // Convex mutations
+    const createComponent = useMutation(api.components.create);
+    const updateComponent = useMutation(api.components.update);
+    const removeComponent = useMutation(api.components.remove);
+
+    const selectedComponent = components?.find(c => c._id === selectedComponentId) || null;
+
+    const handleCreateNew = async () => {
+        try {
+            const newId = await createComponent({
+                name: 'New Component',
+                status: 'draft',
+                version: '0.0.1',
+                code: '// Generated code will appear here',
+                docs: 'Documentation pending...'
+            });
+            setSelectedComponentId(newId);
+        } catch (error) {
+            console.error('Failed to create component:', error);
+        }
+    };
+
+    const handleDelete = async (id: Id<"components">) => {
+        try {
+            await removeComponent({ id });
+            if (selectedComponentId === id) {
+                setSelectedComponentId(null);
+            }
+        } catch (error) {
+            console.error('Failed to delete component:', error);
+        }
     };
 
     const handleGenerate = async () => {
@@ -36,15 +60,31 @@ export const ComponentBuilder: React.FC<BuilderProps> = ({ components, setCompon
             const code = await generateComponentCode(prompt, tokens, selectedComponent.code);
             const docs = await generateDocumentation(code);
             
-            const updated = { ...selectedComponent, code, docs, name: prompt.split(' ')[0] || selectedComponent.name };
+            // Extract component name from prompt
+            const newName = prompt.split(' ').find(word => 
+                word.length > 2 && word[0] === word[0].toUpperCase()
+            ) || selectedComponent.name;
             
-            setComponents(prev => prev.map(c => c.id === updated.id ? updated : c));
-            setSelectedComponent(updated);
+            await updateComponent({
+                id: selectedComponent._id,
+                code,
+                docs,
+                name: newName
+            });
+            
             setPrompt('');
         } catch (e) {
             alert('Generation failed. Please check API Key.');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleStatusChange = async (id: Id<"components">, status: ConvexComponent['status']) => {
+        try {
+            await updateComponent({ id, status });
+        } catch (error) {
+            console.error('Failed to update status:', error);
         }
     };
 
@@ -57,22 +97,51 @@ export const ComponentBuilder: React.FC<BuilderProps> = ({ components, setCompon
                         <h2 className="text-xl font-semibold text-primary">Builder</h2>
                         <p className="text-sm text-muted">AI-powered generation.</p>
                     </div>
-                    <button onClick={handleCreateNew} className="text-xs bg-bg-inverse text-inverse px-2 py-1.5 rounded font-medium hover:opacity-90">
+                    <button 
+                        onClick={handleCreateNew} 
+                        className="text-xs bg-bg-inverse text-inverse px-2 py-1.5 rounded font-medium hover:opacity-90"
+                    >
                         + New
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {components.map(c => (
+                    {components?.map(c => (
                         <div 
-                            key={c.id} 
-                            onClick={() => setSelectedComponent(c)}
-                            className={`p-4 border-b border-border cursor-pointer hover:bg-surface/50 ${selectedComponent?.id === c.id ? 'bg-surface border-l-2 border-l-primary' : ''}`}
+                            key={c._id} 
+                            onClick={() => setSelectedComponentId(c._id)}
+                            className={`p-4 border-b border-border cursor-pointer hover:bg-surface/50 group ${selectedComponentId === c._id ? 'bg-surface border-l-2 border-l-primary' : ''}`}
                         >
-                            <div className="font-medium text-sm text-primary">{c.name}</div>
+                            <div className="flex justify-between items-start">
+                                <div className="font-medium text-sm text-primary">{c.name}</div>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(c._id);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 p-1"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
                             <div className="flex justify-between mt-1">
-                                <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${c.status === 'stable' ? 'bg-green-500/10 text-green-600' : 'bg-yellow-500/10 text-yellow-600'}`}>
-                                    {c.status}
-                                </span>
+                                <select
+                                    value={c.status}
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(c._id, e.target.value as ConvexComponent['status']);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`text-[10px] uppercase px-1.5 py-0.5 rounded bg-transparent border-none cursor-pointer ${
+                                        c.status === 'stable' ? 'text-green-600' : 
+                                        c.status === 'review' ? 'text-yellow-600' : 
+                                        c.status === 'deprecated' ? 'text-red-600' : 'text-zinc-500'
+                                    }`}
+                                >
+                                    <option value="draft">Draft</option>
+                                    <option value="review">Review</option>
+                                    <option value="stable">Stable</option>
+                                    <option value="deprecated">Deprecated</option>
+                                </select>
                                 <span className="text-xs text-muted font-mono">v{c.version}</span>
                             </div>
                         </div>
@@ -100,7 +169,8 @@ export const ComponentBuilder: React.FC<BuilderProps> = ({ components, setCompon
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
-                             <span className="text-xs text-muted">Auto-save on</span>
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span className="text-xs text-muted">Synced to Convex</span>
                         </div>
                     </div>
 

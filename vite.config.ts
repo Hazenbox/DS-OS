@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      // Optimize Convex
+      optimizeDeps: {
+        include: ['convex/react', 'convex/browser'],
+      },
     };
 });

@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from './convex/_generated/api';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TokenManager } from './components/TokenManager';
 import { ComponentBuilder } from './components/ComponentBuilder';
 import { ReleaseManager } from './components/ReleaseManager';
 import { Settings } from './components/Settings';
-import { ViewState, Token, ComponentItem, TokenActivity } from './types';
-import { BookOpen, MessageSquare } from 'lucide-react';
+import { ViewState, convexTokenToLegacy, convexComponentToLegacy, convexActivityToLegacy } from './types';
+import { BookOpen, MessageSquare, Loader2, Database } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // Convex queries
+  const convexTokens = useQuery(api.tokens.list, {});
+  const convexComponents = useQuery(api.components.list, {});
+  const convexActivity = useQuery(api.activity.list, { limit: 50 });
+
+  // Convex mutations
+  const seedData = useMutation(api.seed.seedInitialData);
+
+  // Convert to legacy format for backward compatibility
+  const tokens = convexTokens?.map(convexTokenToLegacy) || [];
+  const components = convexComponents?.map(convexComponentToLegacy) || [];
+  const activity = convexActivity?.map(convexActivityToLegacy) || [];
+
+  // Check if data needs seeding
+  const needsSeeding = convexTokens !== undefined && convexTokens.length === 0;
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -23,48 +42,73 @@ const App: React.FC = () => {
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
-  
-  // Initial Mock Data
-  const [tokens, setTokens] = useState<Token[]>([
-    { id: '1', name: 'primary', value: '#3b82f6', type: 'color' },
-    { id: '2', name: 'surface', value: '#18181b', type: 'color' },
-    { id: '3', name: 'text-base', value: '16px', type: 'typography' },
-    { id: '4', name: 'spacing-4', value: '1rem', type: 'spacing' },
-    { id: '5', name: 'radius-md', value: '0.375rem', type: 'radius' },
-    { id: '6', name: 'shadow-sm', value: '0 1px 2px 0 rgb(0 0 0 / 0.05)', type: 'shadow' },
-  ]);
-  
-  const [tokenActivity, setTokenActivity] = useState<TokenActivity[]>([
-      { id: '1', user: 'System', action: 'create', target: 'Initial Tokens', timestamp: new Date().toISOString() }
-  ]);
 
-  const [components, setComponents] = useState<ComponentItem[]>([
-    { 
-        id: '1', 
-        name: 'Button', 
-        status: 'stable', 
-        version: '1.2.0', 
-        code: `export const Button = ({ children, variant = 'primary' }) => (\n  <button className="px-4 py-2 rounded bg-blue-500 text-white">\n    {children}\n  </button>\n);`, 
-        docs: '# Button\n\nPrimary UI component for user interaction.' 
-    },
-    { 
-        id: '2', 
-        name: 'Input', 
-        status: 'review', 
-        version: '0.9.0', 
-        code: `export const Input = (props) => (\n  <input {...props} className="border border-zinc-700 bg-transparent p-2 rounded" />\n);`, 
-        docs: '# Input\n\nBasic text input field.' 
-    },
-  ]);
+  const handleSeedData = async () => {
+    setIsSeeding(true);
+    try {
+      await seedData();
+    } catch (error) {
+      console.error('Failed to seed data:', error);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // Loading state
+  if (convexTokens === undefined || convexComponents === undefined) {
+    return (
+      <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-sm text-zinc-500">Connecting to database...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - offer to seed
+  if (needsSeeding) {
+    return (
+      <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+        <div className="flex flex-col items-center gap-6 max-w-md text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
+            <Database className="w-8 h-8 text-blue-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
+              Welcome to DS-OS
+            </h1>
+            <p className="text-sm text-zinc-500">
+              Your database is empty. Would you like to seed it with initial design tokens and components?
+            </p>
+          </div>
+          <button
+            onClick={handleSeedData}
+            disabled={isSeeding}
+            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isSeeding ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Seeding...
+              </>
+            ) : (
+              'Seed Initial Data'
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard components={components} />;
+        return <Dashboard components={components} activity={activity} />;
       case 'tokens':
-        return <TokenManager tokens={tokens} setTokens={setTokens} activity={tokenActivity} setActivity={setTokenActivity} />;
+        return <TokenManager />;
       case 'builder':
-        return <ComponentBuilder components={components} setComponents={setComponents} tokens={tokens} />;
+        return <ComponentBuilder tokens={tokens} />;
       case 'releases':
         return <ReleaseManager components={components} />;
       case 'settings':
@@ -102,7 +146,7 @@ const App: React.FC = () => {
             </div>
           );
       default:
-        return <Dashboard components={components} />;
+        return <Dashboard components={components} activity={activity} />;
     }
   };
 
