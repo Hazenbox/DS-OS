@@ -4,7 +4,8 @@ import { api } from '../convex/_generated/api';
 import { Id } from '../convex/_generated/dataModel';
 import { Token, ConvexComponent } from '../types';
 import { generateComponentCode, generateDocumentation } from '../services/geminiService';
-import { Send, Zap, Code, FileText, Loader2, Trash2, Play, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { Send, Zap, Code, FileText, Loader2, Trash2, Play, Eye, EyeOff, Copy, Check, Figma } from 'lucide-react';
+import { FigmaComponentGenerator } from './FigmaComponentGenerator';
 import Editor from '@monaco-editor/react';
 import { 
   SandpackProvider, 
@@ -78,6 +79,7 @@ export const ComponentBuilder: React.FC<BuilderProps> = ({ tokens }) => {
     const [showPreview, setShowPreview] = useState(true);
     const [copied, setCopied] = useState(false);
     const [localCode, setLocalCode] = useState<string | null>(null);
+    const [showFigmaGenerator, setShowFigmaGenerator] = useState(false);
 
     // Convex queries
     const components = useQuery(api.components.list, {});
@@ -214,12 +216,20 @@ export default NewComponent;`,
                         <h2 className="text-lg font-semibold text-primary">Builder</h2>
                         <p className="text-xs text-muted">AI-powered generation</p>
                     </div>
-                    <button 
-                        onClick={handleCreateNew} 
-                        className="text-xs bg-bg-inverse text-inverse px-2.5 py-1.5 rounded font-medium hover:opacity-90"
-                    >
-                        + New
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setShowFigmaGenerator(true)}
+                            className="text-xs bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white px-2.5 py-1.5 rounded font-medium hover:opacity-90 flex items-center gap-1.5"
+                        >
+                            <Figma size={12} /> Figma
+                        </button>
+                        <button 
+                            onClick={handleCreateNew} 
+                            className="text-xs bg-bg-inverse text-inverse px-2.5 py-1.5 rounded font-medium hover:opacity-90"
+                        >
+                            + New
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {components?.map(c => (
@@ -399,14 +409,33 @@ export default NewComponent;`,
                         <Zap size={24} />
                     </div>
                     <p className="text-sm">Select a component or create new to start building</p>
-                    <button
-                        onClick={handleCreateNew}
-                        className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90"
-                    >
-                        Create Component
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowFigmaGenerator(true)}
+                            className="px-4 py-2 bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg text-sm font-medium hover:opacity-90 flex items-center gap-2"
+                        >
+                            <Figma size={14} />
+                            From Figma
+                        </button>
+                        <button
+                            onClick={handleCreateNew}
+                            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90"
+                        >
+                            Create Blank
+                        </button>
+                    </div>
                 </div>
             )}
+
+            {/* Figma Component Generator Modal */}
+            <FigmaComponentGenerator
+                isOpen={showFigmaGenerator}
+                onClose={() => setShowFigmaGenerator(false)}
+                tokens={tokens}
+                onComponentGenerated={(id) => {
+                    setSelectedComponentId(id as Id<"components">);
+                }}
+            />
         </div>
     );
 };

@@ -3,8 +3,9 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { Id } from '../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexActivityToLegacy, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Moon, Layers, ChevronDown, Activity, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Moon, Layers, ChevronDown, Activity, X, Figma } from 'lucide-react';
 import { TokenExport } from './TokenExport';
+import { FigmaImport } from './FigmaImport';
 
 const TABS: { id: TokenType; label: string }[] = [
     { id: 'color', label: 'Colors' },
@@ -25,6 +26,7 @@ export const TokenManager: React.FC = () => {
     const [isDarkModePreview, setIsDarkModePreview] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showFigmaImport, setShowFigmaImport] = useState(false);
     const [newToken, setNewToken] = useState({ name: '', value: '', description: '' });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +232,12 @@ export const TokenManager: React.FC = () => {
                             className="hidden" 
                             onChange={handleFileUpload} 
                         />
+                        <button 
+                            onClick={() => setShowFigmaImport(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-[#1E1E1E] border border-zinc-700 rounded hover:bg-zinc-800"
+                        >
+                            <Figma size={14} /> Figma Variables
+                        </button>
                         <button 
                             onClick={() => fileInputRef.current?.click()}
                             className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary bg-surface border border-border rounded hover:bg-surface/80"
@@ -502,6 +510,12 @@ export const TokenManager: React.FC = () => {
                 tokens={(tokens || []).map(convexTokenToLegacy)} 
                 isOpen={showExportModal} 
                 onClose={() => setShowExportModal(false)} 
+            />
+
+            {/* Figma Import Modal */}
+            <FigmaImport 
+                isOpen={showFigmaImport} 
+                onClose={() => setShowFigmaImport(false)} 
             />
         </div>
     );
