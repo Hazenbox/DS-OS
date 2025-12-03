@@ -4,88 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Orbit Design Orchestrator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>DS-OS | Design System Orchestrator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
-    <style>
-      :root {
-        --bg-background: #ffffff;
-        --bg-surface: #f4f4f5;
-        --border: #EDEDED;
-        --text-primary: #18181b;
-        --text-muted: #71717a;
-        --text-inverse: #ffffff;
-        --bg-inverse: #18181b;
-      }
-      .dark {
-        --bg-background: #191919;
-        --bg-surface: #18181b;
-        --border: #2A2A2A;
-        --text-primary: #e4e4e7;
-        --text-muted: #a1a1aa;
-        --text-inverse: #000000;
-        --bg-inverse: #e4e4e7;
-      }
-      body {
-        background-color: var(--bg-background);
-        color: var(--text-primary);
-        font-family: 'Geist', sans-serif;
-      }
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: var(--border); 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-muted); 
-      }
-    </style>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Geist', 'sans-serif'],
-              mono: ['Geist Mono', 'monospace'],
-            },
-            colors: {
-              background: 'var(--bg-background)',
-              surface: 'var(--bg-surface)',
-              border: 'var(--border)',
-              primary: 'var(--text-primary)',
-              muted: 'var(--text-muted)',
-              inverse: 'var(--text-inverse)',
-              'bg-inverse': 'var(--bg-inverse)',
-              accent: '#3b82f6',
-            }
-          }
-        }
-      }
-    </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+  </head>
   <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
