@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { Token } from '../types';
-import { Figma, Loader2, AlertCircle, Check, ExternalLink, X, Sparkles } from 'lucide-react';
+import { Figma, Loader2, AlertCircle, Check, ExternalLink, X, Sparkles, Settings, Layers, Box, Palette } from 'lucide-react';
 
 interface FigmaComponentGeneratorProps {
     isOpen: boolean;
@@ -14,7 +14,6 @@ interface FigmaComponentGeneratorProps {
 interface FigmaNodeInfo {
     fileKey: string;
     nodeId: string;
-    name?: string;
 }
 
 export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = ({ 
@@ -24,27 +23,27 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
     onComponentGenerated 
 }) => {
     const [figmaUrl, setFigmaUrl] = useState('');
-    const [step, setStep] = useState<'input' | 'fetching' | 'preview' | 'generating' | 'success'>('input');
+    const [step, setStep] = useState<'input' | 'fetching' | 'preview' | 'generating' | 'success' | 'error'>('input');
     const [error, setError] = useState<string | null>(null);
     const [nodeInfo, setNodeInfo] = useState<FigmaNodeInfo | null>(null);
+    const [extractedProps, setExtractedProps] = useState<any>(null);
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
+    // Convex
+    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus);
+    const figmaPat = useQuery(api.figma.getFigmaPat);
+    const fetchFigmaNode = useAction(api.figma.fetchFigmaNode);
+    const generateCode = useAction(api.figma.generateComponentCode);
     const createComponent = useMutation(api.components.create);
 
     if (!isOpen) return null;
 
     const parseFigmaUrl = (url: string): FigmaNodeInfo | null => {
         try {
-            // Handle different Figma URL formats:
-            // https://www.figma.com/design/{fileKey}/{fileName}?node-id={nodeId}
-            // https://www.figma.com/file/{fileKey}/{fileName}?node-id={nodeId}
-            // Or just a node ID like "2012:48557" or "2012-48557"
-            
             if (url.includes('figma.com')) {
                 const urlObj = new URL(url);
                 const pathParts = urlObj.pathname.split('/').filter(Boolean);
                 
-                // /design/{fileKey}/... or /file/{fileKey}/...
                 const fileKeyIndex = pathParts.findIndex(p => p === 'design' || p === 'file');
                 if (fileKeyIndex === -1 || !pathParts[fileKeyIndex + 1]) {
                     return null;
@@ -57,12 +56,9 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
                     return null;
                 }
                 
-                // Convert node-id from URL format (1-2) to Figma API format (1:2)
                 const nodeId = nodeIdParam.replace('-', ':');
-                
                 return { fileKey, nodeId };
             } else {
-                // Assume it's just a node ID
                 const nodeId = url.replace('-', ':').trim();
                 if (/^\d+:\d+$/.test(nodeId)) {
                     return { fileKey: '', nodeId };
@@ -75,7 +71,16 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
         }
     };
 
-    const generateComponentFromFigma = async () => {
+    const extractComponentName = (name: string): string => {
+        // Clean up the name and convert to PascalCase
+        return name
+            .replace(/[^a-zA-Z0-9\s]/g, '')
+            .split(/\s+/)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join('');
+    };
+
+    const handleFetchFromFigma = async () => {
         setError(null);
         
         const parsed = parseFigmaUrl(figmaUrl);
@@ -84,152 +89,95 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
             return;
         }
         
+        if (!parsed.fileKey) {
+            setError('Could not extract file key from URL.');
+            return;
+        }
+
+        if (!figmaPat) {
+            setError('Figma Personal Access Token not configured. Please add it in Settings.');
+            return;
+        }
+        
         setNodeInfo(parsed);
         setStep('fetching');
         
         try {
-            // Since we can't directly call the Figma API from the browser,
-            // we'll use the Figma MCP tool if available, or generate a template
-            // that the user can refine with AI
+            // Fetch from Figma API via Convex action
+            const result = await fetchFigmaNode({
+                fileKey: parsed.fileKey,
+                nodeId: parsed.nodeId,
+                figmaPat: figmaPat,
+            });
             
-            // For now, generate a component template based on the URL info
-            const componentName = extractComponentName(figmaUrl);
-            const code = generateComponentTemplate(componentName, tokens);
+            if (!result.success) {
+                setError(result.error || 'Failed to fetch from Figma');
+                setStep('error');
+                return;
+            }
+            
+            setExtractedProps(result.data);
+            
+            // Generate component code
+            const componentName = extractComponentName(result.data?.name || 'Component');
+            const code = await generateCode({
+                properties: result.data,
+                componentName,
+            });
             
             setGeneratedCode(code);
             setStep('preview');
         } catch (err) {
-            setError('Failed to fetch component from Figma. Please try again.');
-            setStep('input');
+            console.error('Figma fetch error:', err);
+            setError('Failed to fetch component from Figma. Please check your token and try again.');
+            setStep('error');
         }
     };
 
-    const extractComponentName = (url: string): string => {
-        // Try to extract a meaningful name from the URL
-        try {
-            const urlObj = new URL(url);
-            const pathParts = urlObj.pathname.split('/').filter(Boolean);
-            
-            // The file name is usually the last path part
-            if (pathParts.length >= 3) {
-                const fileName = pathParts[pathParts.length - 1];
-                // Extract first word that looks like a component name
-                const match = fileName.match(/([A-Z][a-z]+)/);
-                if (match) return match[1];
-            }
-        } catch {}
-        
-        return 'FigmaComponent';
-    };
-
-    const generateComponentTemplate = (name: string, tokens: Token[]): string => {
-        // Generate CSS variables from tokens
-        const colorTokens = tokens.filter(t => t.type === 'color');
-        const spacingTokens = tokens.filter(t => t.type === 'spacing');
-        const radiusTokens = tokens.filter(t => t.type === 'radius');
-        
-        // Find primary/brand colors
-        const primaryColor = colorTokens.find(t => t.name.includes('primary') || t.name.includes('brand'));
-        const textColor = colorTokens.find(t => t.name.includes('text') && !t.name.includes('on'));
-        
-        return `import React from 'react';
-
-interface ${name}Props {
-  children?: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  disabled?: boolean;
-  onClick?: () => void;
-  className?: string;
-}
-
-/**
- * ${name} Component
- * 
- * Generated from Figma design. Uses design tokens for consistent styling.
- * 
- * @example
- * <${name} variant="primary" size="md">
- *   Click me
- * </${name}>
- */
-export const ${name}: React.FC<${name}Props> = ({
-  children,
-  variant = 'primary',
-  size = 'md',
-  disabled = false,
-  onClick,
-  className = '',
-}) => {
-  const baseStyles = \`
-    inline-flex items-center justify-center font-medium rounded-lg
-    transition-all duration-200 ease-in-out
-    focus:outline-none focus:ring-2 focus:ring-offset-2
-    disabled:opacity-50 disabled:cursor-not-allowed
-  \`;
-  
-  const variants = {
-    primary: \`
-      bg-[${primaryColor?.value || 'var(--color-primary, #3b82f6)'}] 
-      text-white 
-      hover:opacity-90 
-      focus:ring-blue-500
-    \`,
-    secondary: \`
-      bg-zinc-100 dark:bg-zinc-800 
-      text-zinc-900 dark:text-zinc-100 
-      hover:bg-zinc-200 dark:hover:bg-zinc-700
-      focus:ring-zinc-500
-    \`,
-    outline: \`
-      border-2 border-current 
-      text-[${primaryColor?.value || 'var(--color-primary, #3b82f6)'}]
-      hover:bg-blue-50 dark:hover:bg-blue-900/20
-      focus:ring-blue-500
-    \`,
-    ghost: \`
-      text-zinc-700 dark:text-zinc-300
-      hover:bg-zinc-100 dark:hover:bg-zinc-800
-      focus:ring-zinc-500
-    \`,
-  };
-  
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm gap-1.5',
-    md: 'px-4 py-2 text-sm gap-2',
-    lg: 'px-6 py-3 text-base gap-2.5',
-  };
-  
-  return (
-    <button
-      className={\`\${baseStyles} \${variants[variant]} \${sizes[size]} \${className}\`}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-};
-
-export default ${name};
-`;
-    };
-
     const handleSaveComponent = async () => {
-        if (!generatedCode || !nodeInfo) return;
+        if (!generatedCode || !extractedProps) return;
         
         setStep('generating');
         
         try {
-            const componentName = extractComponentName(figmaUrl);
+            const componentName = extractComponentName(extractedProps.name || 'Component');
+            
+            // Generate documentation
+            const docs = `# ${componentName}
+
+Auto-generated from Figma with full property extraction.
+
+## Properties Extracted
+
+- **Dimensions**: ${extractedProps.dimensions?.width}x${extractedProps.dimensions?.height}px
+- **Layout**: ${extractedProps.layout?.mode} (${extractedProps.layout?.direction || 'none'})
+- **Fills**: ${extractedProps.fills?.length || 0} (${extractedProps.fills?.map((f: any) => f.type).join(', ') || 'none'})
+- **Strokes**: ${extractedProps.strokes?.length || 0}
+- **Effects**: ${extractedProps.effects?.length || 0} (${extractedProps.effects?.map((e: any) => e.type).join(', ') || 'none'})
+- **Corner Radius**: ${typeof extractedProps.cornerRadius === 'number' ? extractedProps.cornerRadius + 'px' : 'varies'}
+${extractedProps.variants?.length > 0 ? `- **Variants**: ${extractedProps.variants.length}` : ''}
+
+## Usage
+
+\`\`\`tsx
+import { ${componentName} } from '@org/ui';
+
+<${componentName}>
+  Content here
+</${componentName}>
+\`\`\`
+
+## Source
+
+Generated from Figma node: \`${nodeInfo?.nodeId}\`
+`;
             
             const componentId = await createComponent({
                 name: componentName,
                 status: 'draft',
                 version: '0.1.0',
                 code: generatedCode,
-                docs: `# ${componentName}\n\nGenerated from Figma design.\n\n**Source:** ${figmaUrl}\n\n## Usage\n\n\`\`\`tsx\nimport { ${componentName} } from '@org/ui';\n\n<${componentName} variant="primary">\n  Button text\n</${componentName}>\n\`\`\``,
+                docs,
             });
             
             setStep('success');
@@ -251,12 +199,15 @@ export default ${name};
         setStep('input');
         setError(null);
         setNodeInfo(null);
+        setExtractedProps(null);
         setGeneratedCode(null);
     };
 
+    const isPatConfigured = figmaPatStatus?.configured;
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="bg-background rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b border-border">
                     <div className="flex items-center gap-3">
@@ -265,7 +216,12 @@ export default ${name};
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold text-primary">Generate from Figma</h3>
-                            <p className="text-xs text-muted">Create components from Figma designs</p>
+                            <p className="text-xs text-muted">
+                                {isPatConfigured 
+                                    ? 'Full API extraction (shadows, gradients, auto-layout)'
+                                    : 'Configure Figma PAT for full extraction'
+                                }
+                            </p>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-muted hover:text-primary p-1">
@@ -277,6 +233,34 @@ export default ${name};
                 <div className="flex-1 overflow-y-auto p-4">
                     {step === 'input' && (
                         <div className="space-y-4">
+                            {/* PAT Status */}
+                            {!isPatConfigured && (
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                                    <div className="flex gap-3">
+                                        <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-amber-600">Figma Token Required</p>
+                                            <p className="text-xs text-amber-600/70 mt-1">
+                                                To use full Figma API extraction, please configure your Personal Access Token in Settings.
+                                            </p>
+                                            <button
+                                                onClick={onClose}
+                                                className="mt-2 text-xs text-amber-600 font-medium hover:underline flex items-center gap-1"
+                                            >
+                                                <Settings size={12} /> Go to Settings
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isPatConfigured && (
+                                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2">
+                                    <Check size={16} className="text-green-500" />
+                                    <span className="text-sm text-green-600">Figma API connected</span>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-primary mb-2">
                                     Figma Component URL
@@ -287,61 +271,121 @@ export default ${name};
                                     onChange={(e) => setFigmaUrl(e.target.value)}
                                     placeholder="https://www.figma.com/design/...?node-id=123:456"
                                     className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-sm text-primary focus:outline-none focus:border-accent"
+                                    disabled={!isPatConfigured}
                                 />
                                 <p className="text-xs text-muted mt-2">
-                                    Paste a Figma link with a component selected. The URL should contain a <code className="bg-surface px-1 rounded">node-id</code> parameter.
+                                    Select a component in Figma, then copy the URL from your browser.
                                 </p>
                             </div>
 
-                            <div className="p-4 bg-surface/50 rounded-lg space-y-3">
-                                <h4 className="text-sm font-medium text-primary">How it works:</h4>
-                                <ol className="text-xs text-muted space-y-2 list-decimal list-inside">
-                                    <li>Select a component or component set in Figma</li>
-                                    <li>Copy the URL from your browser (with the component selected)</li>
-                                    <li>Paste the URL above and click "Generate Component"</li>
-                                    <li>Review the generated code and save to your library</li>
-                                    <li>Use AI prompts in the Builder to refine the component</li>
-                                </ol>
-                            </div>
-
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex gap-2">
-                                <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-amber-600">
-                                    <strong>Note:</strong> This generates a template based on your design tokens. 
-                                    For full Figma extraction, use the Figma MCP integration with <code className="bg-amber-500/20 px-1 rounded">@mcp figma</code> in the AI prompt.
-                                </p>
+                            {/* What gets extracted */}
+                            <div className="p-4 bg-surface/50 rounded-lg">
+                                <h4 className="text-sm font-medium text-primary mb-3">Full Extraction Includes:</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="flex items-center gap-2 text-xs text-muted">
+                                        <Palette size={14} className="text-accent" />
+                                        <span>Colors & Gradients</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted">
+                                        <Layers size={14} className="text-accent" />
+                                        <span>Shadows & Effects</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted">
+                                        <Box size={14} className="text-accent" />
+                                        <span>Auto-layout (Flexbox)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted">
+                                        <Settings size={14} className="text-accent" />
+                                        <span>Component Variants</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {step === 'fetching' && (
                         <div className="flex flex-col items-center justify-center py-12">
-                            <Loader2 size={32} className="animate-spin text-accent mb-4" />
-                            <p className="text-sm text-primary">Fetching component from Figma...</p>
-                            <p className="text-xs text-muted mt-1">Node ID: {nodeInfo?.nodeId}</p>
+                            <div className="relative">
+                                <Loader2 size={32} className="animate-spin text-accent" />
+                                <Figma size={14} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-accent" />
+                            </div>
+                            <p className="text-sm text-primary mt-4">Fetching from Figma API...</p>
+                            <p className="text-xs text-muted mt-1">Extracting all properties</p>
                         </div>
                     )}
 
-                    {step === 'preview' && generatedCode && (
+                    {step === 'preview' && extractedProps && (
                         <div className="space-y-4">
-                            <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                                <Check size={16} className="text-green-500" />
-                                <span className="text-sm text-green-600">Component template generated!</span>
+                            {/* Extraction Summary */}
+                            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Check size={16} className="text-green-500" />
+                                    <span className="text-sm font-medium text-green-600">
+                                        Extracted: {extractedProps.name}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                    <div className="bg-white/50 dark:bg-black/20 rounded p-2">
+                                        <span className="text-muted">Size</span>
+                                        <p className="font-mono text-primary">
+                                            {Math.round(extractedProps.dimensions?.width)}×{Math.round(extractedProps.dimensions?.height)}
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/50 dark:bg-black/20 rounded p-2">
+                                        <span className="text-muted">Fills</span>
+                                        <p className="font-mono text-primary">{extractedProps.fills?.length || 0}</p>
+                                    </div>
+                                    <div className="bg-white/50 dark:bg-black/20 rounded p-2">
+                                        <span className="text-muted">Effects</span>
+                                        <p className="font-mono text-primary">{extractedProps.effects?.length || 0}</p>
+                                    </div>
+                                    <div className="bg-white/50 dark:bg-black/20 rounded p-2">
+                                        <span className="text-muted">Layout</span>
+                                        <p className="font-mono text-primary">{extractedProps.layout?.mode || 'None'}</p>
+                                    </div>
+                                </div>
                             </div>
 
+                            {/* Extracted Styles Preview */}
+                            {(extractedProps.fills?.length > 0 || extractedProps.effects?.length > 0) && (
+                                <div className="border border-border rounded-lg overflow-hidden">
+                                    <div className="bg-surface/50 px-3 py-2 border-b border-border">
+                                        <span className="text-xs font-medium text-primary">Extracted Styles</span>
+                                    </div>
+                                    <div className="p-3 space-y-2 text-xs">
+                                        {extractedProps.fills?.map((fill: any, i: number) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <div 
+                                                    className="w-6 h-6 rounded border border-border"
+                                                    style={{ 
+                                                        background: fill.type === 'gradient' ? fill.gradient : fill.color 
+                                                    }}
+                                                />
+                                                <span className="text-muted">
+                                                    {fill.type === 'gradient' ? 'Gradient' : fill.color}
+                                                </span>
+                                            </div>
+                                        ))}
+                                        {extractedProps.effects?.map((effect: any, i: number) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <span className="text-accent font-mono">{effect.type}:</span>
+                                                <span className="text-muted truncate">{effect.css}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Generated Code */}
                             <div className="border border-border rounded-lg overflow-hidden">
                                 <div className="bg-surface/50 px-3 py-2 border-b border-border flex justify-between items-center">
-                                    <span className="text-xs font-medium text-primary">Generated Code</span>
-                                    <span className="text-xs text-muted">TypeScript React</span>
+                                    <span className="text-xs font-medium text-primary">Generated React Component</span>
+                                    <span className="text-xs text-muted">TypeScript</span>
                                 </div>
-                                <pre className="p-4 text-xs text-primary font-mono overflow-x-auto max-h-[300px] overflow-y-auto bg-[#1e1e1e] text-zinc-300">
+                                <pre className="p-4 text-xs font-mono overflow-x-auto max-h-[250px] overflow-y-auto bg-[#1e1e1e] text-zinc-300">
                                     {generatedCode}
                                 </pre>
                             </div>
-
-                            <p className="text-xs text-muted">
-                                This is a starting template using your design tokens. After saving, use the AI Builder to refine the component based on your Figma design.
-                            </p>
                         </div>
                     )}
 
@@ -362,8 +406,24 @@ export default ${name};
                         </div>
                     )}
 
-                    {/* Error */}
-                    {error && (
+                    {step === 'error' && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                                <AlertCircle size={32} className="text-red-500" />
+                            </div>
+                            <p className="text-lg font-medium text-primary">Extraction Failed</p>
+                            <p className="text-sm text-red-500 mt-1">{error}</p>
+                            <button
+                                onClick={handleReset}
+                                className="mt-4 text-sm text-accent hover:underline"
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Error (inline) */}
+                    {error && step === 'input' && (
                         <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
                             <AlertCircle size={16} className="text-red-500" />
                             <span className="text-sm text-red-600">{error}</span>
@@ -394,12 +454,12 @@ export default ${name};
                         
                         {step === 'input' && (
                             <button
-                                onClick={generateComponentFromFigma}
-                                disabled={!figmaUrl.trim()}
-                                className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 flex items-center gap-2"
+                                onClick={handleFetchFromFigma}
+                                disabled={!figmaUrl.trim() || !isPatConfigured}
+                                className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 <Sparkles size={14} />
-                                Generate Component
+                                Extract from Figma
                             </button>
                         )}
                         
@@ -409,7 +469,7 @@ export default ${name};
                                 className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent/90 flex items-center gap-2"
                             >
                                 <Check size={14} />
-                                Save to Builder
+                                Save Component
                             </button>
                         )}
                     </div>
@@ -418,4 +478,3 @@ export default ${name};
         </div>
     );
 };
-
