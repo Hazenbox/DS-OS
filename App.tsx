@@ -7,13 +7,44 @@ import { TokenManager } from './components/TokenManager';
 import { ComponentBuilder } from './components/ComponentBuilder';
 import { ReleaseManager } from './components/ReleaseManager';
 import { Settings } from './components/Settings';
+import { Login } from './components/Login';
+import { Signup } from './components/Signup';
+import { EmailVerification } from './components/EmailVerification';
 import { ViewState, convexTokenToLegacy, convexComponentToLegacy, convexActivityToLegacy } from './types';
 import { BookOpen, MessageSquare, Loader2, Database } from 'lucide-react';
+
+interface User {
+  userId: string;
+  email: string;
+  name?: string;
+  role: string;
+}
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSeeding, setIsSeeding] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
+  
+  // Authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'signup' | null>(null);
+
+  // Check for stored user on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setAuthView(null);
+      } catch (e) {
+        localStorage.removeItem('user');
+      }
+    } else {
+      setAuthView('login');
+    }
+  }, []);
 
   // Convex queries
   const convexTokens = useQuery(api.tokens.list, {});
@@ -22,6 +53,19 @@ const App: React.FC = () => {
 
   // Convex mutations
   const seedData = useMutation(api.seed.seedInitialData);
+
+  // Check backend availability with timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (convexTokens === undefined && convexComponents === undefined) {
+        setBackendAvailable(false);
+      } else {
+        setBackendAvailable(true);
+      }
+    }, 3000); // Wait 3 seconds before assuming backend is unavailable
+
+    return () => clearTimeout(timer);
+  }, [convexTokens, convexComponents]);
 
   // Convert to legacy format for backward compatibility
   const tokens = convexTokens?.map(convexTokenToLegacy) || [];
@@ -54,13 +98,44 @@ const App: React.FC = () => {
     }
   };
 
-  // Loading state
-  if (convexTokens === undefined || convexComponents === undefined) {
+  // Authentication handlers
+  const handleLoginSuccess = (userData: User) => {
+    setUser(userData);
+    setAuthView(null);
+  };
+
+  const handleSignupSuccess = (userData: User) => {
+    // Email is auto-verified, so directly log the user in
+    setUser(userData);
+    setAuthView(null);
+    // Store user in localStorage
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    setAuthView('login');
+  };
+
+  // Show auth screens if not logged in
+  if (!user) {
+    if (authView === 'signup') {
+      return <Signup onSignupSuccess={handleSignupSuccess} onSwitchToLogin={() => setAuthView('login')} />;
+    }
+    return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignup={() => setAuthView('signup')} />;
+  }
+
+  // Loading state - but allow fallback if backend is unavailable
+  if ((convexTokens === undefined || convexComponents === undefined) && backendAvailable !== false) {
     return (
       <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           <p className="text-sm text-zinc-500">Connecting to database...</p>
+          {backendAvailable === false && (
+            <p className="text-xs text-zinc-400 mt-2">Backend unavailable - using offline mode</p>
+          )}
         </div>
       </div>
     );
@@ -119,7 +194,6 @@ const App: React.FC = () => {
             <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-primary">Documentation</h2>
-                    <p className="text-sm text-muted">External documentation hub.</p>
                 </div>
             </div>
             <div className="flex-1 flex flex-col items-center justify-center text-muted space-y-4">
@@ -135,7 +209,6 @@ const App: React.FC = () => {
                 <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
                     <div>
                         <h2 className="text-xl font-semibold text-primary">Feedback</h2>
-                        <p className="text-sm text-muted">User feedback from connected apps.</p>
                     </div>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center text-muted space-y-4">
@@ -152,10 +225,15 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] font-sans text-primary selection:bg-accent/30 transition-colors duration-200">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} />
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user} onLogout={handleLogout} />
       
-      <div className="flex-1 h-full p-[10px] overflow-hidden">
-        <main className="h-full w-full rounded-[12px] bg-background shadow-sm overflow-hidden relative border border-border">
+      <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
+        {backendAvailable === false && (
+          <div className="mb-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
+            ⚠️ Backend unavailable - Running in offline mode. Data changes will not be persisted.
+          </div>
+        )}
+        <main className="flex-1 h-full w-full rounded-[12px] bg-background overflow-hidden relative border border-border/30">
           {renderView()}
         </main>
       </div>

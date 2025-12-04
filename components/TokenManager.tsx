@@ -222,7 +222,6 @@ export const TokenManager: React.FC = () => {
                 <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
                     <div>
                         <h2 className="text-xl font-semibold text-primary">Tokens</h2>
-                        <p className="text-sm text-muted">Manage your system's visual primitives.</p>
                     </div>
                     <div className="flex gap-2">
                          <input 

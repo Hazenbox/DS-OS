@@ -39,51 +39,50 @@ cd DS-OS
 npm install
 ```
 
-2. **Set up Convex:**
+2. **Configure Environment Variables:**
+
+Copy the example file:
 
 ```bash
-# Login to Convex (creates account if needed)
-npx convex login
-
-# Initialize Convex for this project
-npx convex dev
+cp .env.example .env.local
 ```
 
-This will create a `.env.local` file with your `VITE_CONVEX_URL`.
+The `.env.example` file contains the **shared backend URL** that all contributors use. No need to set up Convex individually!
 
-3. **Add Gemini API Key (for AI features):**
-
-Create a `.env.local` file with:
+Edit `.env.local` to add your optional API keys:
 
 ```env
+# Shared Convex Backend URL (already configured)
+VITE_CONVEX_URL=https://your-project-name.convex.cloud
+
+# Optional: Gemini API Key for AI features
 GEMINI_API_KEY=your_gemini_api_key_here
-VITE_CONVEX_URL=https://your-deployment.convex.cloud
 ```
+
+**Note:** The shared backend is already deployed and ready to use. Contributors don't need to run `npx convex dev` or set up their own Convex accounts!
 
 Get your Gemini API key from [Google AI Studio](https://aistudio.google.com/).
 
-4. **Run the app:**
+3. **Run the app:**
 
 ```bash
-# Run both Convex backend and Vite frontend
-npm run dev
-```
-
-Or run them separately:
-
-```bash
-# Terminal 1: Convex backend
-npm run dev:backend
-
-# Terminal 2: Vite frontend  
+# Start the frontend (backend is already deployed and shared)
 npm run dev:frontend
 ```
 
-5. **Open the app:**
+The shared backend is already running in the cloud, so you only need to start the frontend!
+
+4. **Open the app:**
 
 Navigate to [http://localhost:3000](http://localhost:3000)
 
-On first load, you'll be prompted to seed the database with initial tokens and components.
+On first load, you'll be prompted to:
+- Sign up / Login with email
+- Seed the database with initial tokens and components (optional)
+
+## Setting Up the Shared Backend (For Maintainers)
+
+If you're setting up the shared backend for the first time, see [SETUP_SHARED_BACKEND.md](./SETUP_SHARED_BACKEND.md) for instructions.
 
 ## Project Structure
 
@@ -129,7 +128,9 @@ You can also self-host Convex using Docker. See the [Convex self-hosting guide](
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed setup instructions.
+
+**Important:** Each contributor needs their own Convex account and deployment. This ensures isolated development environments and prevents conflicts. See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ## License
 

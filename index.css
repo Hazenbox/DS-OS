@@ -7,7 +7,7 @@
   --color-accent: #8b5cf6;
   --color-surface: #f4f4f5;
   --color-background: #ffffff;
-  --color-border: #e4e4e7;
+  --color-border: rgba(228, 228, 231, 0.5);
   --color-inverse: #ffffff;
   --color-bg-inverse: #09090b;
   
@@ -23,14 +23,14 @@
   --color-accent: #8b5cf6;
   --color-surface: #f4f4f5;
   --color-background: #ffffff;
-  --color-border: #e4e4e7;
+  --color-border: rgba(228, 228, 231, 0.5);
   --color-inverse: #ffffff;
   --color-bg-inverse: #09090b;
   
   /* Legacy variable names for compatibility */
   --bg-background: #ffffff;
   --bg-surface: #f4f4f5;
-  --border: #e4e4e7;
+  --border: rgba(228, 228, 231, 0.5);
   --text-primary: #09090b;
   --text-muted: #71717a;
   --text-inverse: #ffffff;
@@ -44,14 +44,14 @@
   --color-accent: #a78bfa;
   --color-surface: #27272a;
   --color-background: #18181b;
-  --color-border: #3f3f46;
+  --color-border: rgba(63, 63, 70, 0.3);
   --color-inverse: #09090b;
   --color-bg-inverse: #fafafa;
   
   /* Legacy variable names for compatibility */
   --bg-background: #18181b;
   --bg-surface: #27272a;
-  --border: #3f3f46;
+  --border: rgba(63, 63, 70, 0.3);
   --text-primary: #fafafa;
   --text-muted: #a1a1aa;
   --text-inverse: #09090b;

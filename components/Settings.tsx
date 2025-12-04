@@ -65,7 +65,6 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
             <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-primary">Settings</h2>
-                    <p className="text-sm text-muted">Manage your workspace preferences.</p>
                 </div>
             </div>
 
@@ -73,7 +72,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                 <div className="max-w-2xl mx-auto space-y-6">
                     
                     {/* Appearance */}
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center">
@@ -94,7 +93,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                     </div>
 
                     {/* Figma PAT - NEW */}
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <div className="flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] flex items-center justify-center flex-shrink-0">
                                 <Figma size={20} className="text-white" />
@@ -108,7 +107,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                 {figmaPatStatus?.configured && (
                                     <div className="mb-3 p-2 bg-green-500/10 border border-green-500/20 rounded flex items-center gap-2">
                                         <Check size={14} className="text-green-500" />
-                                        <span className="text-xs text-green-600">
+                                            <span className="text-xs text-green-600 dark:text-green-400">
                                             Token configured: {figmaPatStatus.masked}
                                         </span>
                                     </div>
@@ -157,7 +156,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                     <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded">
                                         <div className="flex gap-2">
                                             <AlertCircle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                                            <div className="text-xs text-amber-600">
+                                            <div className="text-xs text-amber-600 dark:text-amber-400">
                                                 <p className="font-medium mb-1">Required Scopes:</p>
                                                 <ul className="list-disc list-inside space-y-0.5">
                                                     <li>File content (read-only)</li>
@@ -172,7 +171,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                     </div>
 
                     {/* Gemini API Key */}
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <div className="flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center flex-shrink-0">
                                 <Key size={20} className="text-primary" />
@@ -224,7 +223,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                     </div>
 
                     {/* Database Status */}
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center">
@@ -237,13 +236,13 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                <span className="text-sm text-green-600 font-medium">Connected</span>
+                                <span className="text-sm text-green-600 dark:text-green-400 font-medium">Connected</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Integrations */}
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <h3 className="font-medium text-primary mb-4">Integrations</h3>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between py-3 border-b border-border">
@@ -271,7 +270,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                     {figmaPatStatus?.configured ? (
                                         <>
                                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                            <span className="text-xs text-green-600">Connected</span>
+                                            <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
                                         </>
                                     ) : (
                                         <>
@@ -300,7 +299,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                     </div>
 
                     {/* Danger Zone */}
-                    <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-6">
+                    <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg p-6">
                         <h3 className="font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h3>
                         <p className="text-sm text-red-600/70 dark:text-red-400/70 mb-4">
                             These actions are irreversible. Please proceed with caution.

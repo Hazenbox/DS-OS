@@ -80,5 +80,26 @@ export default defineSchema({
     name: v.string(),
     isDefault: v.boolean(),
   }),
+
+  // Users
+  users: defineTable({
+    email: v.string(),
+    emailVerified: v.boolean(),
+    name: v.optional(v.string()),
+    role: v.union(v.literal("admin"), v.literal("user")),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"]),
+
+  // Email verification tokens
+  emailVerifications: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expiresAt: v.number(),
+    verified: v.boolean(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
 });
 

@@ -8,13 +8,13 @@ interface DashboardProps {
 }
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; delta?: string }> = ({ title, value, icon, delta }) => (
-    <div className="bg-[#fafafa] dark:bg-white/5 p-4 rounded-lg">
+    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border p-4 rounded-lg">
         <div className="flex justify-between items-start mb-2">
             <span className="text-muted text-xs uppercase tracking-wider font-semibold">{title}</span>
             <span className="text-muted">{icon}</span>
         </div>
         <div className="text-2xl font-mono text-primary mb-1">{value}</div>
-        {delta && <div className="text-xs text-green-500">{delta}</div>}
+        {delta && <div className="text-xs text-green-500 dark:text-green-400">{delta}</div>}
     </div>
 );
 
@@ -40,9 +40,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
         <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
             <div>
                 <h2 className="text-xl font-semibold text-primary">Overview</h2>
-                <p className="text-sm text-muted">Monitor the health and velocity of your design system.</p>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 rounded-full text-xs font-medium">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 Connected to Convex
             </div>
@@ -78,14 +77,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="space-y-4">
                         <h3 className="text-lg font-medium text-primary">Pipeline Status</h3>
-                        <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg divide-y divide-border">
+                        <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg divide-y divide-border">
                             {integrations.map((int) => (
                                 <div key={int.name} className="p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-2 h-2 rounded-full ${int.connected ? 'bg-green-500' : 'bg-zinc-400'}`} />
                                         <span className="text-sm font-medium text-primary">{int.name}</span>
                                     </div>
-                                    <span className={`text-xs font-mono ${int.connected ? 'text-green-600' : 'text-muted'}`}>
+                                    <span className={`text-xs font-mono ${int.connected ? 'text-green-600 dark:text-green-400' : 'text-muted'}`}>
                                         {int.lastSync}
                                     </span>
                                 </div>
@@ -95,7 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-medium text-primary">Recent Activity</h3>
-                        <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-4">
+                        <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-4">
                             {recentActivity.length === 0 ? (
                                 <p className="text-sm text-muted text-center py-4">No recent activity</p>
                             ) : (
@@ -119,9 +118,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                 {/* Component Overview */}
                 <div className="space-y-4">
                     <h3 className="text-lg font-medium text-primary">Component Status</h3>
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg overflow-hidden">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
-                            <thead className="bg-black/5 dark:bg-white/5">
+                            <thead className="bg-black/5 dark:bg-white/[0.03]">
                                 <tr>
                                     <th className="px-4 py-3 text-left font-medium text-muted">Component</th>
                                     <th className="px-4 py-3 text-left font-medium text-muted">Status</th>
@@ -134,10 +133,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                                         <td className="px-4 py-3 font-medium text-primary">{comp.name}</td>
                                         <td className="px-4 py-3">
                                             <span className={`text-xs uppercase px-2 py-0.5 rounded ${
-                                                comp.status === 'stable' ? 'bg-green-500/10 text-green-600' :
-                                                comp.status === 'review' ? 'bg-yellow-500/10 text-yellow-600' :
-                                                comp.status === 'deprecated' ? 'bg-red-500/10 text-red-600' :
-                                                'bg-zinc-500/10 text-zinc-600'
+                                                comp.status === 'stable' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                                                comp.status === 'review' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                comp.status === 'deprecated' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                                'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'
                                             }`}>
                                                 {comp.status}
                                             </span>

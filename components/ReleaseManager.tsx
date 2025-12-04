@@ -127,7 +127,6 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
             <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-primary">Release</h2>
-                    <p className="text-sm text-muted">Orchestrate package publishing to NPM and documentation.</p>
                 </div>
                 <div className="flex gap-2 items-center">
                     <span className="text-xs text-muted font-mono">
@@ -150,7 +149,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg p-6">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <h3 className="text-sm font-semibold text-primary mb-4">Pipeline Status</h3>
                         
                         {activeDeploy ? (
@@ -158,7 +157,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                                 <div className="absolute left-[21px] top-2 bottom-2 w-0.5 bg-border -z-10" />
                                 {activeDeploy.map((step, idx) => (
                                     <div key={step.step} className="flex items-center gap-4">
-                                        <div className="bg-[#fafafa] dark:bg-black/20 rounded-full">{getStatusIcon(step.status)}</div>
+                                        <div className="bg-background border border-border rounded-full p-1">{getStatusIcon(step.status)}</div>
                                         <div className="flex-1">
                                             <div className="text-sm font-medium capitalize text-primary">{step.step}</div>
                                             <div className="text-xs text-muted">
@@ -178,8 +177,8 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
                     {/* Release History */}
                     {releases && releases.length > 0 && (
-                        <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg overflow-hidden">
-                            <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/5">
+                        <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/[0.03]">
                                 <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                                     <Package size={14} /> Release History
                                 </h3>
@@ -190,10 +189,10 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                                         <div className="flex items-center gap-3">
                                             <span className="font-mono font-medium text-primary">{release.version}</span>
                                             <span className={`text-xs px-2 py-0.5 rounded ${
-                                                release.status === 'published' ? 'bg-green-500/10 text-green-600' :
-                                                release.status === 'in_progress' ? 'bg-yellow-500/10 text-yellow-600' :
-                                                release.status === 'failed' ? 'bg-red-500/10 text-red-600' :
-                                                'bg-zinc-500/10 text-zinc-600'
+                                                release.status === 'published' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                                                release.status === 'in_progress' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                release.status === 'failed' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                                'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'
                                             }`}>
                                                 {release.status}
                                             </span>
@@ -210,8 +209,8 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                         </div>
                     )}
 
-                    <div className="bg-[#fafafa] dark:bg-white/5 rounded-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/5">
+                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg overflow-hidden">
+                        <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/[0.03]">
                             <h3 className="text-sm font-semibold text-primary">Changelog Preview</h3>
                         </div>
                         <div className="p-6 font-mono text-sm text-muted space-y-2">
