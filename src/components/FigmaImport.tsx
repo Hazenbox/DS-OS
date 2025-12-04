@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useMutation } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { api } from '../../convex/_generated/api';
 import { TokenType } from '../types';
 import { Upload, FileJson, Check, AlertCircle, X, Loader2, Figma } from 'lucide-react';
 

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../convex/_generated/api';
-import { Id } from '../convex/_generated/dataModel';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { Token, ConvexComponent } from '../types';
 import { generateComponentCode, generateDocumentation } from '../services/geminiService';
 import { Send, Zap, Code, FileText, Loader2, Trash2, Play, Eye, EyeOff, Copy, Check, Figma } from 'lucide-react';

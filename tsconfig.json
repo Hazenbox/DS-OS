@@ -13,7 +13,7 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,
@@ -25,10 +25,8 @@
     "resolveJsonModule": true
   },
   "include": [
-    "*.ts",
-    "*.tsx",
-    "components/**/*",
-    "services/**/*",
+    "src/**/*",
+    "src/vite-env.d.ts",
     "convex/**/*"
   ],
   "exclude": ["node_modules", "dist"]

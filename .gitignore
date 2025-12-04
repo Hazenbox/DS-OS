@@ -29,3 +29,11 @@ convex.jsonc
 *.njsproj
 *.sln
 *.sw?
+
+# Build outputs
+*.tsbuildinfo
+dist/
+build/
+
+# Scripts output (if any)
+scripts/*.log

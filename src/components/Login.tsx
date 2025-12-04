@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { api } from '../../convex/_generated/api';
 import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginProps {

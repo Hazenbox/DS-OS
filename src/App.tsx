@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from './convex/_generated/api';
+import { api } from '../convex/_generated/api';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TokenManager } from './components/TokenManager';
@@ -127,15 +127,24 @@ const App: React.FC = () => {
   }
 
   // Loading state - but allow fallback if backend is unavailable
-  if ((convexTokens === undefined || convexComponents === undefined) && backendAvailable !== false) {
+  if (convexTokens === undefined || convexComponents === undefined) {
+    if (backendAvailable === false) {
+      // Backend is confirmed unavailable, show warning but continue
+      return (
+        <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <p className="text-sm text-zinc-500">Backend unavailable - using offline mode</p>
+          </div>
+        </div>
+      );
+    }
+    // Still loading, show loading state
     return (
       <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           <p className="text-sm text-zinc-500">Connecting to database...</p>
-          {backendAvailable === false && (
-            <p className="text-xs text-zinc-400 mt-2">Backend unavailable - using offline mode</p>
-          )}
         </div>
       </div>
     );

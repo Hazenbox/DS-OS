@@ -1,4 +1,4 @@
-import { Id } from "./convex/_generated/dataModel";
+import { Id } from "../../convex/_generated/dataModel";
 
 export type ViewState = 'dashboard' | 'tokens' | 'builder' | 'documentation' | 'releases' | 'feedback' | 'settings';
 
