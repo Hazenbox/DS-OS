@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Loader2, AlertCircle, Eye, EyeOff, Github } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, EyeOff, Github, Layers, Code2, GitBranch, Package } from 'lucide-react';
 
 interface UserData {
   userId: string;
@@ -58,70 +58,103 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
     }
   };
 
-  const inputStyle = {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)'
-  };
-
   return (
-    <div className="flex h-screen w-full" style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#0a0a0a]">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-between" style={{ backgroundColor: '#0f0f0f' }}>
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-between bg-[#f0f0f0] dark:bg-[#0f0f0f]">
         {/* Gradient glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-40" 
-          style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)' }} 
-        />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-30 dark:opacity-40 bg-gradient-to-b from-emerald-500 to-transparent" />
         
-        {/* Content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-4">Get Started<br />with Us</h1>
-          <p className="text-[#888] text-sm leading-relaxed">
-            Complete these easy steps to register your account.
+        {/* Logo */}
+        <div className="relative z-10 flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 dark:bg-emerald-500/30 flex items-center justify-center">
+            <Layers size={18} className="text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <span className="text-lg font-semibold text-zinc-900 dark:text-white">DS-OS</span>
+        </div>
+
+        {/* Main Content */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md">
+          <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 leading-tight">
+            Build Better<br />
+            <span className="text-emerald-600 dark:text-emerald-400">Design Systems</span>
+          </h1>
+          <p className="text-zinc-600 dark:text-[#888] text-sm leading-relaxed mb-8">
+            Join teams using DS-OS to transform Figma designs into production-ready 
+            components with AI-powered generation and centralized token management.
           </p>
+
+          {/* Features */}
+          <div className="space-y-3">
+            {[
+              { icon: Code2, label: 'Component Generation', desc: 'Figma to React in seconds' },
+              { icon: GitBranch, label: 'Version Control', desc: 'Track every change' },
+              { icon: Package, label: 'NPM Publishing', desc: 'Ship packages instantly' },
+            ].map((feature, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white/50 dark:bg-white/5 border border-zinc-200 dark:border-white/10">
+                <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                  <feature.icon size={16} className="text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-white">{feature.label}</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-500">{feature.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Steps */}
-        <div className="relative z-10 flex gap-4">
+        <div className="relative z-10 flex gap-3">
           {[
-            { num: 1, label: 'Sign up your account', active: true },
-            { num: 2, label: 'Set up your workspace', active: false },
-            { num: 3, label: 'Set up your profile', active: false },
+            { num: 1, label: 'Create account', active: true },
+            { num: 2, label: 'Setup workspace', active: false },
+            { num: 3, label: 'Import tokens', active: false },
           ].map((step) => (
             <div 
               key={step.num}
-              className="flex-1 p-3 rounded-lg border text-center"
-              style={{ 
-                backgroundColor: step.active ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                borderColor: step.active ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.1)'
-              }}
+              className={`flex-1 p-2.5 rounded-lg border text-center transition-all
+                ${step.active 
+                  ? 'bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30' 
+                  : 'bg-transparent border-zinc-200 dark:border-white/10'
+                }`}
             >
               <div 
-                className="w-6 h-6 rounded-full mx-auto mb-2 flex items-center justify-center text-xs font-medium"
-                style={{ 
-                  backgroundColor: step.active ? '#10b981' : 'rgba(255,255,255,0.1)',
-                  color: step.active ? '#000' : '#666'
-                }}
+                className={`w-5 h-5 rounded-full mx-auto mb-1.5 flex items-center justify-center text-[10px] font-semibold
+                  ${step.active 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-zinc-600'
+                  }`}
               >
                 {step.num}
               </div>
-              <p className="text-xs" style={{ color: step.active ? '#fff' : '#666' }}>{step.label}</p>
+              <p className={`text-[10px] ${step.active ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-600'}`}>
+                {step.label}
+              </p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6" style={{ backgroundColor: '#0a0a0a' }}>
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-white dark:bg-[#0a0a0a]">
         <div className="w-full max-w-sm">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+              <Layers size={22} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <span className="text-xl font-semibold text-zinc-900 dark:text-white">DS-OS</span>
+          </div>
+
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-white mb-1">Sign Up Account</h2>
-            <p className="text-xs" style={{ color: '#666' }}>Enter your personal data to create your account.</p>
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-1">Create your account</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500">Start building your design system today.</p>
           </div>
 
           {/* OAuth Buttons */}
           <div className="flex gap-3 mb-4">
-            <button className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md border text-xs font-medium transition-colors hover:bg-white/5"
-              style={{ borderColor: 'rgba(255,255,255,0.15)', color: '#fff' }}>
+            <button className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md border border-zinc-200 dark:border-white/15 text-xs font-medium text-zinc-700 dark:text-white transition-colors hover:bg-zinc-50 dark:hover:bg-white/5">
               <svg width="14" height="14" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -130,8 +163,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
               </svg>
               Google
             </button>
-            <button className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md border text-xs font-medium transition-colors hover:bg-white/5"
-              style={{ borderColor: 'rgba(255,255,255,0.15)', color: '#fff' }}>
+            <button className="flex-1 h-8 flex items-center justify-center gap-2 rounded-md border border-zinc-200 dark:border-white/15 text-xs font-medium text-zinc-700 dark:text-white transition-colors hover:bg-zinc-50 dark:hover:bg-white/5">
               <Github size={14} />
               Github
             </button>
@@ -139,14 +171,13 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
 
           {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />
-            <span className="text-xs" style={{ color: '#666' }}>Or</span>
-            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />
+            <div className="flex-1 h-px bg-zinc-200 dark:bg-white/10" />
+            <span className="text-xs text-zinc-400 dark:text-zinc-600">Or</span>
+            <div className="flex-1 h-px bg-zinc-200 dark:bg-white/10" />
           </div>
 
           {error && (
-            <div className="mb-3 p-2 rounded-md flex items-center gap-2 text-xs" 
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444' }}>
+            <div className="mb-3 p-2 rounded-md flex items-center gap-2 text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400">
               <AlertCircle size={14} />
               <span>{error}</span>
             </div>
@@ -156,44 +187,41 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
             {/* Name fields side by side */}
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-white/80 mb-1.5">First Name</label>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">First Name</label>
                 <input
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full h-8 px-3 rounded-md text-xs text-white placeholder:text-[#555] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                  style={inputStyle}
-                  placeholder="eg. John"
+                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  placeholder="John"
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-xs font-medium text-white/80 mb-1.5">Last Name</label>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">Last Name</label>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full h-8 px-3 rounded-md text-xs text-white placeholder:text-[#555] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                  style={inputStyle}
-                  placeholder="eg. Francisco"
+                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  placeholder="Doe"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-white/80 mb-1.5">Email</label>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-8 px-3 rounded-md text-xs text-white placeholder:text-[#555] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                style={inputStyle}
-                placeholder="eg. johnfrans@gmail.com"
+                className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                placeholder="you@company.com"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-white/80 mb-1.5">Password</label>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -201,26 +229,24 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full h-8 px-3 pr-9 rounded-md text-xs text-white placeholder:text-[#555] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                  style={inputStyle}
-                  placeholder="Enter your password"
+                  className="w-full h-8 px-3 pr-9 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  placeholder="Minimum 8 characters"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#555] hover:text-white transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-white transition-colors"
                 >
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: '#555' }}>Must be at least 8 characters.</p>
+              <p className="text-[10px] mt-1 text-zinc-400 dark:text-zinc-600">Must be at least 8 characters.</p>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-8 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 hover:bg-white hover:text-black disabled:opacity-50"
-              style={{ border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}
+              className="w-full h-8 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
             >
               {isLoading ? (
                 <>
@@ -228,15 +254,15 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                   Creating account...
                 </>
               ) : (
-                'Sign Up'
+                'Create Account'
               )}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-xs" style={{ color: '#666' }}>
+          <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-500">
             Already have an account?{' '}
-            <button onClick={onSwitchToLogin} className="text-white hover:underline font-medium">
-              Log in
+            <button onClick={onSwitchToLogin} className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
+              Sign in
             </button>
           </p>
         </div>
