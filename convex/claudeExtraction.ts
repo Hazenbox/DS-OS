@@ -407,9 +407,10 @@ export const extractAndBuildComponent = action({
     }
     
     // Get API keys from settings
+    // Figma PAT is stored with key 'figma_pat' (set via api.figma.setFigmaPat)
     const figmaPat = await ctx.runQuery(api.settings.get, { 
       userId: args.userId, 
-      key: 'figmaPat' 
+      key: 'figma_pat' 
     });
     
     const claudeApiKey = await ctx.runQuery(api.settings.get, { 
@@ -491,7 +492,7 @@ export const getApiKeyStatus = action({
   handler: async (ctx, args): Promise<{ hasFigmaPat: boolean; hasClaudeApiKey: boolean }> => {
     const figmaPat: string | null = await ctx.runQuery(api.settings.get, { 
       userId: args.userId, 
-      key: 'figmaPat' 
+      key: 'figma_pat' 
     });
     
     const claudeApiKey: string | null = await ctx.runQuery(api.settings.get, { 
