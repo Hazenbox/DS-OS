@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewState } from '../types';
-import { Hexagon, ChevronDown, Plus, LogOut, User } from 'lucide-react';
+import { Hexagon, ChevronDown, LogOut } from 'lucide-react';
 
 interface User {
   userId: string;
@@ -18,10 +18,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
-  const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -40,23 +38,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     };
   }, [isUserMenuOpen]);
 
-  // Close project menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (projectMenuRef.current && !projectMenuRef.current.contains(event.target as Node)) {
-        setIsProjectMenuOpen(false);
-      }
-    };
-
-    if (isProjectMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isProjectMenuOpen]);
-
   const navItems: { id: ViewState; label: string }[] = [
     { id: 'dashboard', label: 'Overview' },
     { id: 'tokens', label: 'Tokens' },
@@ -74,37 +55,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 <Hexagon size={20} fill="currentColor" />
             </div>
             <div>
-                <h1 className="font-bold text-sm tracking-tight text-primary">Orbit</h1>
-                <p className="text-xs text-muted">Design System OS</p>
+                <h1 className="font-bold text-sm tracking-tight text-primary">DS-OS</h1>
+                <p className="text-xs text-muted">Design System Platform</p>
             </div>
-        </div>
-
-        <div className="relative" ref={projectMenuRef}>
-            <button 
-                onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
-                className="w-full h-8 flex items-center justify-between px-3 text-sm font-medium text-primary bg-black/[0.08] dark:bg-white/[0.05] rounded-lg border border-transparent dark:border-white/10 transition-all duration-200 ease-in-out hover:bg-black/10 dark:hover:bg-white/[0.08]"
-            >
-                <span>Orbit Design System</span>
-                <ChevronDown size={14} className={`text-primary/70 transition-transform ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {isProjectMenuOpen && (
-                <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
-                    <div className="px-3 h-8 flex items-center text-xs font-semibold text-muted uppercase tracking-wider">Projects</div>
-                    <button className="w-full h-8 text-left px-3 text-sm text-primary hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                        Orbit DS (Active)
-                    </button>
-                    <button className="w-full h-8 text-left px-3 text-sm text-muted hover:text-primary hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
-                        <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600"></div>
-                        Marketing Site
-                    </button>
-                    <div className="h-px bg-zinc-200 dark:bg-zinc-700 my-1"></div>
-                    <button className="w-full h-8 text-left px-3 text-sm text-accent hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
-                        <Plus size={14} /> Create Project
-                    </button>
-                </div>
-            )}
         </div>
       </div>
 
@@ -159,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                   <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
                     <div className="px-3 h-8 flex flex-col justify-center border-b border-zinc-200 dark:border-zinc-700">
                       <div className="text-sm font-medium text-zinc-900 dark:text-white leading-tight">
-                        {user.name || 'Upen'}
+                        {user.name || user.email.split('@')[0]}
                       </div>
                       <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate leading-tight">
                         {user.email}
