@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from 'convex/react';
-import { api } from '../convex/_generated/api';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TokenManager } from './components/TokenManager';
@@ -10,9 +8,10 @@ import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
+import { ProjectModal } from './components/ProjectModal';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ViewState } from './types';
-import { BookOpen, MessageSquare, Loader2, FolderOpen } from 'lucide-react';
+import { BookOpen, MessageSquare, FolderOpen, Plus } from 'lucide-react';
 
 interface User {
   userId: string;
@@ -33,7 +32,8 @@ const AppContent: React.FC<{
   onThemeModeChange: (mode: ThemeMode) => void;
 }> = ({ user, onLogout, themeMode, resolvedTheme, onThemeModeChange }) => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  const { activeProject, projectId, isLoading } = useProject();
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const { activeProject, projectId, isLoading, userId } = useProject();
 
   const renderView = () => {
     // Show "no project" state if no active project
@@ -43,19 +43,30 @@ const AppContent: React.FC<{
           <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
             <div>
               <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
-                {currentView === 'settings' ? 'Settings' : 'No Project Selected'}
+                {currentView === 'settings' ? 'Settings' : 'Get Started'}
               </h2>
             </div>
           </div>
           {currentView === 'settings' ? (
             <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
-              <FolderOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Create a Project</h2>
-              <p className="max-w-md text-center text-sm">
-                Select or create a project from the dropdown in the sidebar to get started.
-              </p>
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-6">
+              <div className="w-20 h-20 rounded-2xl bg-violet-500/10 flex items-center justify-center">
+                <FolderOpen size={40} className="text-violet-500" strokeWidth={1.5} />
+              </div>
+              <div className="text-center space-y-2">
+                <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Create Your First Project</h2>
+                <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+                  Projects help you organize your design tokens, components, and releases.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowProjectModal(true)}
+                className="flex items-center gap-2 px-5 h-10 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors shadow-sm"
+              >
+                <Plus size={18} />
+                Create Project
+              </button>
             </div>
           )}
         </div>
@@ -109,15 +120,32 @@ const AppContent: React.FC<{
   };
 
   return (
-    <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user} onLogout={onLogout} />
-      
-      <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
-        <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
-          {renderView()}
-        </main>
+    <>
+      <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
+        <Sidebar 
+          currentView={currentView} 
+          onChangeView={setCurrentView} 
+          user={user} 
+          onLogout={onLogout}
+          onOpenProjectModal={() => setShowProjectModal(true)}
+        />
+        
+        <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
+          <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
+            {renderView()}
+          </main>
+        </div>
       </div>
-    </div>
+      
+      {/* Project Creation Modal */}
+      {userId && (
+        <ProjectModal
+          isOpen={showProjectModal}
+          onClose={() => setShowProjectModal(false)}
+          userId={userId}
+        />
+      )}
+    </>
   );
 };
 

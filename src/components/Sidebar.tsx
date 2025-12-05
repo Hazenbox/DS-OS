@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { ViewState } from '../types';
-import { Hexagon, ChevronDown, LogOut, Plus, Check, Loader2, FolderOpen } from 'lucide-react';
+import { Hexagon, ChevronDown, LogOut, Plus, Check, FolderOpen } from 'lucide-react';
 import { Id } from '../../convex/_generated/dataModel';
 
 interface User {
@@ -17,24 +17,20 @@ interface SidebarProps {
   onChangeView: (view: ViewState) => void;
   user: User | null;
   onLogout: () => void;
+  onOpenProjectModal: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout, onOpenProjectModal }) => {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const userMenuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Convex queries and mutations - scoped to user
   const userId = user?.email;
   const projects = useQuery(api.projects.list, userId ? { userId } : "skip") || [];
   const activeProject = useQuery(api.projects.getActive, userId ? { userId } : "skip");
-  const createProject = useMutation(api.projects.create);
   const setActiveProject = useMutation(api.projects.setActive);
 
   // Close menus when clicking outside
@@ -45,39 +41,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       }
       if (projectMenuRef.current && !projectMenuRef.current.contains(event.target as Node)) {
         setIsProjectMenuOpen(false);
-        setIsCreating(false);
-        setNewProjectName('');
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Focus input when creating
-  useEffect(() => {
-    if (isCreating && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isCreating]);
-
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim() || isSubmitting || !userId) return;
-    
-    setIsSubmitting(true);
-    try {
-      await createProject({ 
-        name: newProjectName.trim(),
-        userId,
-      });
-      setNewProjectName('');
-      setIsCreating(false);
-    } catch (error) {
-      console.error('Failed to create project:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleSelectProject = async (projectId: Id<"projects">) => {
     if (!userId) return;
@@ -129,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 Projects
               </div>
               
-              {projects.length === 0 && !isCreating && (
+              {projects.length === 0 && (
                 <div className="px-3 py-4 text-center">
                   <FolderOpen size={24} className="mx-auto mb-2 text-zinc-400 dark:text-zinc-500" />
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">No projects yet</p>
@@ -150,52 +119,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
               
               <div className="h-px bg-zinc-200/60 dark:bg-zinc-700/60 my-1" />
               
-              {isCreating ? (
-                <div className="px-3 py-2">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateProject();
-                      if (e.key === 'Escape') {
-                        setIsCreating(false);
-                        setNewProjectName('');
-                      }
-                    }}
-                    placeholder="Project name..."
-                    className="w-full px-2 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-violet-500"
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={handleCreateProject}
-                      disabled={!newProjectName.trim() || isSubmitting}
-                      className="flex-1 px-2 py-1 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                    >
-                      {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                      Create
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsCreating(false);
-                        setNewProjectName('');
-                      }}
-                      className="px-2 py-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button 
-                  onClick={() => setIsCreating(true)}
-                  className="w-full text-left px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
-                >
-                  <Plus size={14} /> Create Project
-                </button>
-              )}
+              <button 
+                onClick={() => {
+                  setIsProjectMenuOpen(false);
+                  onOpenProjectModal();
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
+              >
+                <Plus size={14} /> Create Project
+              </button>
             </div>
           )}
         </div>
