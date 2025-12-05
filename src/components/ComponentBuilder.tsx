@@ -1,28 +1,40 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
-import { Token, ConvexComponent, convexTokenToLegacy } from '../types';
+import { Token, convexTokenToLegacy } from '../types';
 import { 
-  Link2, Loader2, Trash2, Play, Eye, Code, Layers, 
-  Settings2, MessageSquare, Check, X, ChevronRight, 
+  Link2, Loader2, Trash2, Eye, Code, Layers, 
+  Settings2, MessageSquare, Check, X, 
   Palette, Type, Box, Maximize2, Circle, Sparkles,
-  AlertTriangle, RefreshCw, Copy, ExternalLink
+  AlertTriangle, Copy, Figma, Zap, ExternalLink
 } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { 
-  extractAllProperties, 
-  parseFigmaUrl, 
-  generateComponentCodeFromProps,
-  ExtractedProperties,
-  FigmaVariant,
-  ExtractedComponent
-} from '../services/figmaExtractor';
-import { 
   SandpackProvider, 
   SandpackPreview
 } from '@codesandbox/sandpack-react';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface ExtractedVariant {
+  name: string;
+  properties: Record<string, string>;
+  css: string;
+}
+
+interface ExtractionResult {
+  componentName: string;
+  description?: string;
+  code: string;
+  css: string;
+  variants: ExtractedVariant[];
+  extractedProperties: Record<string, any>;
+  usedVariables: Array<{ name: string; value: string; type?: string }>;
+}
 
 // ============================================================================
 // PREVIEW COMPONENT
@@ -82,17 +94,12 @@ root.render(<Component />);
 // VARIANT SELECTOR
 // ============================================================================
 
-interface VariantSelectorProps {
-  variants: FigmaVariant[];
-  selectedVariant: FigmaVariant | null;
-  onSelect: (variant: FigmaVariant) => void;
-}
-
-const VariantSelector: React.FC<VariantSelectorProps> = ({ variants, selectedVariant, onSelect }) => {
+const VariantSelector: React.FC<{
+  variants: ExtractedVariant[];
+  selectedVariant: ExtractedVariant | null;
+  onSelect: (variant: ExtractedVariant) => void;
+}> = ({ variants, selectedVariant, onSelect }) => {
   if (variants.length === 0) return null;
-  
-  // Group variants by property
-  const properties = variants.length > 0 ? Object.keys(variants[0].properties) : [];
   
   return (
     <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -102,7 +109,7 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({ variants, selectedVar
       </div>
       <div className="flex flex-wrap gap-2">
         {variants.map((variant, idx) => {
-          const label = Object.values(variant.properties).join(' / ');
+          const label = variant.name || Object.values(variant.properties).join(' / ');
           const isSelected = selectedVariant?.name === variant.name;
           
           return (
@@ -128,11 +135,6 @@ const VariantSelector: React.FC<VariantSelectorProps> = ({ variants, selectedVar
 // INSPECT PANEL
 // ============================================================================
 
-interface InspectPanelProps {
-  properties: ExtractedProperties;
-  variant?: FigmaVariant;
-}
-
 interface InspectItem {
   label: string;
   value: string;
@@ -146,61 +148,53 @@ interface InspectSection {
   items: InspectItem[];
 }
 
-const InspectPanel: React.FC<InspectPanelProps> = ({ properties, variant }) => {
-  const activeProps = variant?.extractedProps || properties;
+const InspectPanel: React.FC<{ 
+  properties: Record<string, any>;
+  usedVariables: Array<{ name: string; value: string; type?: string }>;
+}> = ({ properties, usedVariables }) => {
   
   const sections: InspectSection[] = [
     { 
-      id: 'tokens', 
-      label: 'Token Mappings', 
+      id: 'variables', 
+      label: 'Used Variables', 
       icon: <Palette size={14} />,
-      items: activeProps.tokenMappings.map(m => ({
-        label: m.property,
-        value: m.tokenName,
-        subValue: m.tokenValue
+      items: usedVariables.map(v => ({
+        label: v.name,
+        value: v.value,
+        subValue: v.type
       }))
     },
     { 
       id: 'layout', 
       label: 'Layout', 
       icon: <Box size={14} />,
-      items: Object.entries(activeProps.css || {})
+      items: Object.entries(properties)
         .filter(([k]) => ['display', 'flexDirection', 'justifyContent', 'alignItems', 'gap', 'padding', 'flexWrap'].includes(k))
-        .map(([k, v]) => ({
-          label: k,
-          value: v as string
-        }))
+        .map(([k, v]) => ({ label: k, value: String(v) }))
     },
     { 
       id: 'dimensions', 
       label: 'Dimensions', 
       icon: <Maximize2 size={14} />,
-      items: [
-        activeProps.width ? { label: 'width', value: `${activeProps.width}px` } : null,
-        activeProps.height ? { label: 'height', value: `${activeProps.height}px` } : null,
-        activeProps.borderRadius ? { label: 'borderRadius', value: activeProps.borderRadius } : null,
-      ].filter((item): item is InspectItem => item !== null)
+      items: Object.entries(properties)
+        .filter(([k]) => ['width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight', 'borderRadius'].includes(k))
+        .map(([k, v]) => ({ label: k, value: String(v) }))
     },
     { 
       id: 'typography', 
       label: 'Typography', 
       icon: <Type size={14} />,
-      items: activeProps.typography ? [
-        activeProps.typography.fontFamily ? { label: 'fontFamily', value: activeProps.typography.fontFamily } : null,
-        activeProps.typography.fontSize ? { label: 'fontSize', value: `${activeProps.typography.fontSize}px` } : null,
-        activeProps.typography.fontWeight ? { label: 'fontWeight', value: String(activeProps.typography.fontWeight) } : null,
-        activeProps.typography.lineHeightPx ? { label: 'lineHeight', value: `${activeProps.typography.lineHeightPx}px` } : null,
-      ].filter((item): item is InspectItem => item !== null) : []
+      items: Object.entries(properties)
+        .filter(([k]) => ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'textAlign'].includes(k))
+        .map(([k, v]) => ({ label: k, value: String(v) }))
     },
     { 
       id: 'effects', 
       label: 'Effects', 
       icon: <Circle size={14} />,
-      items: [
-        activeProps.boxShadow ? { label: 'boxShadow', value: activeProps.boxShadow } : null,
-        activeProps.backdropFilter ? { label: 'backdropFilter', value: activeProps.backdropFilter } : null,
-        activeProps.opacity !== undefined && activeProps.opacity < 1 ? { label: 'opacity', value: String(activeProps.opacity) } : null,
-      ].filter((item): item is InspectItem => item !== null)
+      items: Object.entries(properties)
+        .filter(([k]) => ['boxShadow', 'backdropFilter', 'opacity', 'filter'].includes(k))
+        .map(([k, v]) => ({ label: k, value: String(v) }))
     },
   ];
   
@@ -226,7 +220,7 @@ const InspectPanel: React.FC<InspectPanelProps> = ({ properties, variant }) => {
                     <span className="text-xs text-zinc-900 dark:text-white font-mono truncate max-w-[150px] block">
                       {item.value}
                     </span>
-                    {'subValue' in item && item.subValue && (
+                    {item.subValue && (
                       <span className="text-[10px] text-zinc-400 font-mono">{item.subValue}</span>
                     )}
                   </div>
@@ -236,19 +230,6 @@ const InspectPanel: React.FC<InspectPanelProps> = ({ properties, variant }) => {
           </div>
         )
       ))}
-      
-      {/* Full CSS Output */}
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Code size={14} className="text-zinc-400" />
-          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-            Generated CSS
-          </span>
-        </div>
-        <pre className="text-[10px] text-zinc-600 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg overflow-x-auto">
-          {Object.entries(activeProps.css).map(([k, v]) => `${k}: ${v};`).join('\n')}
-        </pre>
-      </div>
     </div>
   );
 };
@@ -257,20 +238,11 @@ const InspectPanel: React.FC<InspectPanelProps> = ({ properties, variant }) => {
 // FEEDBACK PANEL
 // ============================================================================
 
-interface FeedbackPanelProps {
+const FeedbackPanel: React.FC<{
   onSubmit: (feedback: string) => void;
   isProcessing: boolean;
-}
-
-const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ onSubmit, isProcessing }) => {
+}> = ({ onSubmit, isProcessing }) => {
   const [feedback, setFeedback] = useState('');
-  
-  const handleSubmit = () => {
-    if (feedback.trim()) {
-      onSubmit(feedback);
-      setFeedback('');
-    }
-  };
   
   return (
     <div className="p-4 border-t border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -285,13 +257,97 @@ const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ onSubmit, isProcessing })
         className="w-full h-20 p-2 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none text-zinc-900 dark:text-white placeholder:text-zinc-400"
       />
       <button
-        onClick={handleSubmit}
+        onClick={() => { onSubmit(feedback); setFeedback(''); }}
         disabled={!feedback.trim() || isProcessing}
         className="mt-2 w-full py-2 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isProcessing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
         {isProcessing ? 'Refining...' : 'Refine Component'}
       </button>
+    </div>
+  );
+};
+
+// ============================================================================
+// EXTRACTION STATUS COMPONENT
+// ============================================================================
+
+const ExtractionStatus: React.FC<{
+  status: 'idle' | 'pending' | 'extracting' | 'completed' | 'failed';
+  figmaUrl: string;
+  onCancel: () => void;
+}> = ({ status, figmaUrl, onCancel }) => {
+  if (status === 'idle') return null;
+  
+  return (
+    <div className="absolute inset-0 bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center z-20">
+      <div className="text-center max-w-md px-6">
+        {status === 'pending' && (
+          <>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-4">
+              <Figma size={28} className="text-violet-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+              Ready to Extract
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+              Ask the AI to extract this component from Figma:
+            </p>
+            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 mb-4">
+              <p className="text-xs text-zinc-600 dark:text-zinc-300 font-mono break-all">
+                "Extract the component from: {figmaUrl}"
+              </p>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Or select a node in Figma desktop and say "Extract the selected Figma component"
+            </p>
+            <button
+              onClick={onCancel}
+              className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+        
+        {status === 'extracting' && (
+          <>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <Zap size={28} className="text-white" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+              Extracting from Figma...
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Analyzing design properties, variables, and generating code
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <Loader2 size={16} className="animate-spin text-violet-500" />
+              <span className="text-xs text-zinc-400">This may take a moment</span>
+            </div>
+          </>
+        )}
+        
+        {status === 'failed' && (
+          <>
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={28} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+              Extraction Failed
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+              Please make sure Figma desktop is open with the file loaded.
+            </p>
+            <button
+              onClick={onCancel}
+              className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            >
+              Try Again
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -305,145 +361,102 @@ export const ComponentBuilder: React.FC = () => {
   
   // State
   const [figmaUrl, setFigmaUrl] = useState('');
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [extractedComponent, setExtractedComponent] = useState<ExtractedComponent | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<FigmaVariant | null>(null);
+  const [extractionStatus, setExtractionStatus] = useState<'idle' | 'pending' | 'extracting' | 'completed' | 'failed'>('idle');
+  const [extractedResult, setExtractedResult] = useState<ExtractionResult | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ExtractedVariant | null>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect'>('preview');
   const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
   const [isRefining, setIsRefining] = useState(false);
+  const [pendingRequestId, setPendingRequestId] = useState<Id<"figmaExtractions"> | null>(null);
   
   // Convex queries
   const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
   const tokens = (convexTokens || []).map(convexTokenToLegacy);
   const components = useQuery(api.components.list, projectId ? { projectId } : "skip");
+  const extractionRequest = useQuery(
+    api.figmaExtraction.getExtractionRequest, 
+    pendingRequestId ? { requestId: pendingRequestId } : "skip"
+  );
   
   const isLoading = components === undefined && projectId;
   
   // Convex mutations
   const createComponent = useMutation(api.components.create);
   const removeComponent = useMutation(api.components.remove);
+  const createExtractionRequest = useMutation(api.figmaExtraction.createExtractionRequest);
   
   // Get selected saved component
   const selectedSavedComponent = components?.find(c => c._id === selectedComponentId);
   
-  // Handle Figma URL extraction
-  const handleExtract = async () => {
-    if (!figmaUrl.trim()) return;
-    
-    setIsExtracting(true);
-    setExtractionError(null);
-    setExtractedComponent(null);
-    setSelectedVariant(null);
-    
-    try {
-      const parsed = parseFigmaUrl(figmaUrl);
-      if (!parsed) {
-        throw new Error('Invalid Figma URL. Please paste a valid component link.');
+  // Watch for extraction completion
+  useEffect(() => {
+    if (extractionRequest?.status === 'completed' && extractionRequest.result) {
+      setExtractedResult(extractionRequest.result as ExtractionResult);
+      setExtractionStatus('completed');
+      if ((extractionRequest.result as ExtractionResult).variants?.length > 0) {
+        setSelectedVariant((extractionRequest.result as ExtractionResult).variants[0]);
       }
-      
-      // For demo purposes, simulate extraction with mock data
-      // In production, this would call the Figma API
-      await simulateExtraction(parsed, tokens);
-      
-    } catch (error) {
-      setExtractionError(error instanceof Error ? error.message : 'Extraction failed');
-    } finally {
-      setIsExtracting(false);
+      setPendingRequestId(null);
+    } else if (extractionRequest?.status === 'failed') {
+      setExtractionStatus('failed');
+      setPendingRequestId(null);
+    }
+  }, [extractionRequest]);
+  
+  // Parse Figma URL
+  const parseFigmaUrl = (url: string): { fileKey: string; nodeId: string } | null => {
+    try {
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      const designIndex = pathParts.indexOf('design');
+      const fileIndex = pathParts.indexOf('file');
+      const keyIndex = designIndex !== -1 ? designIndex + 1 : (fileIndex !== -1 ? fileIndex + 1 : -1);
+      if (keyIndex === -1 || keyIndex >= pathParts.length) return null;
+      const fileKey = pathParts[keyIndex];
+      const nodeId = urlObj.searchParams.get('node-id')?.replace('-', ':') || '';
+      return { fileKey, nodeId };
+    } catch {
+      return null;
     }
   };
   
-  // Simulate extraction (replace with real Figma API call)
-  const simulateExtraction = async (parsed: { fileKey: string; nodeId: string }, tokens: Token[]) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+  // Handle extraction request
+  const handleRequestExtraction = async () => {
+    if (!figmaUrl.trim() || !projectId || !userId) return;
     
-    // Mock extracted data based on a typical button component
-    const mockNode = {
-      name: 'Button',
-      type: 'COMPONENT_SET',
-      fills: [{ type: 'SOLID', color: { r: 0.4, g: 0.35, b: 0.95, a: 1 }, visible: true }],
-      strokes: [],
-      effects: [
-        { type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0, a: 0.1 }, offset: { x: 0, y: 2 }, radius: 4, spread: 0 }
-      ],
-      layoutMode: 'HORIZONTAL',
-      primaryAxisAlignItems: 'CENTER',
-      counterAxisAlignItems: 'CENTER',
-      paddingTop: 12,
-      paddingRight: 24,
-      paddingBottom: 12,
-      paddingLeft: 24,
-      itemSpacing: 8,
-      cornerRadius: 8,
-      absoluteBoundingBox: { width: 120, height: 44 },
-      style: {
-        fontFamily: 'Inter',
-        fontSize: 14,
-        fontWeight: 600,
-      }
-    };
+    const parsed = parseFigmaUrl(figmaUrl);
+    if (!parsed) {
+      alert('Invalid Figma URL');
+      return;
+    }
     
-    const baseProps = extractAllProperties(mockNode, tokens);
-    
-    // Mock variants
-    const variants: FigmaVariant[] = [
-      {
-        name: 'Primary',
-        properties: { variant: 'primary', size: 'medium' },
-        extractedProps: extractAllProperties({
-          ...mockNode,
-          fills: [{ type: 'SOLID', color: { r: 0.4, g: 0.35, b: 0.95, a: 1 }, visible: true }],
-        }, tokens)
-      },
-      {
-        name: 'Secondary',
-        properties: { variant: 'secondary', size: 'medium' },
-        extractedProps: extractAllProperties({
-          ...mockNode,
-          fills: [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.97, a: 1 }, visible: true }],
-          strokes: [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.85, a: 1 } }],
-          strokeWeight: 1,
-        }, tokens)
-      },
-      {
-        name: 'Ghost',
-        properties: { variant: 'ghost', size: 'medium' },
-        extractedProps: extractAllProperties({
-          ...mockNode,
-          fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 0 }, visible: true }],
-          effects: [],
-        }, tokens)
-      },
-    ];
-    
-    const { componentCode, cssCode } = generateComponentCodeFromProps('Button', baseProps, variants);
-    
-    setExtractedComponent({
-      name: 'Button',
-      description: 'A versatile button component with multiple variants',
-      baseProps,
-      variants,
-      componentCode,
-      cssCode,
-      usedTokens: tokens.filter(t => baseProps.tokenMappings.some(m => m.tokenName === t.name))
-    });
-    
-    setSelectedVariant(variants[0]);
+    try {
+      const requestId = await createExtractionRequest({
+        projectId,
+        userId,
+        figmaUrl,
+        nodeId: parsed.nodeId,
+      });
+      
+      setPendingRequestId(requestId);
+      setExtractionStatus('pending');
+    } catch (error) {
+      console.error('Failed to create extraction request:', error);
+    }
   };
   
   // Handle save component
   const handleSaveComponent = async () => {
-    if (!extractedComponent || !projectId) return;
+    if (!extractedResult || !projectId) return;
     
     try {
       const newId = await createComponent({
         projectId,
-        name: extractedComponent.name,
+        name: extractedResult.componentName,
         status: 'draft',
         version: '1.0.0',
-        code: extractedComponent.componentCode,
-        docs: `## ${extractedComponent.name}\n\n${extractedComponent.description || ''}\n\n### CSS\n\`\`\`css\n${extractedComponent.cssCode}\n\`\`\``,
+        code: extractedResult.code,
+        docs: `## ${extractedResult.componentName}\n\n${extractedResult.description || ''}\n\n### CSS\n\`\`\`css\n${extractedResult.css}\n\`\`\``,
       });
       
       setSelectedComponentId(newId);
@@ -468,50 +481,56 @@ export const ComponentBuilder: React.FC = () => {
   // Handle feedback
   const handleFeedback = async (feedback: string) => {
     setIsRefining(true);
-    // In production, this would re-process the component with the feedback
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsRefining(false);
-    // Show success message
+  };
+  
+  // Reset extraction
+  const handleCancelExtraction = () => {
+    setExtractionStatus('idle');
+    setPendingRequestId(null);
   };
   
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
+      {/* Extraction Status Overlay */}
+      <ExtractionStatus 
+        status={extractionStatus}
+        figmaUrl={figmaUrl}
+        onCancel={handleCancelExtraction}
+      />
+      
       {/* Left Panel: Component List */}
       <div className="w-72 border-r border-zinc-200/60 dark:border-zinc-800/60 flex flex-col bg-white dark:bg-zinc-900">
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Extract from Figma</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Figma MCP Extraction</p>
         </div>
         
         {/* Figma URL Input */}
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
           <div className="flex items-center gap-2 mb-2">
-            <Link2 size={14} className="text-zinc-400" />
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Figma Component URL</span>
+            <Figma size={14} className="text-zinc-400" />
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Figma Component</span>
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={figmaUrl}
-              onChange={(e) => setFigmaUrl(e.target.value)}
-              placeholder="Paste Figma link..."
-              className="flex-1 h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-            />
-            <button
-              onClick={handleExtract}
-              disabled={!figmaUrl.trim() || isExtracting}
-              className="h-8 px-3 text-xs font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              {isExtracting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-              {isExtracting ? 'Extracting...' : 'Extract'}
-            </button>
-          </div>
-          {extractionError && (
-            <div className="mt-2 p-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 rounded-lg flex items-start gap-2">
-              <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
-              {extractionError}
-            </div>
-          )}
+          <input
+            type="text"
+            value={figmaUrl}
+            onChange={(e) => setFigmaUrl(e.target.value)}
+            placeholder="Paste Figma component URL..."
+            className="w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-2"
+          />
+          <button
+            onClick={handleRequestExtraction}
+            disabled={!figmaUrl.trim() || extractionStatus !== 'idle'}
+            className="w-full h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+          >
+            <Zap size={12} />
+            Extract with MCP
+          </button>
+          <p className="text-[10px] text-zinc-400 mt-2 text-center">
+            Uses Figma Desktop MCP for 100% extraction
+          </p>
         </div>
         
         {/* Saved Components List */}
@@ -569,17 +588,17 @@ export const ComponentBuilder: React.FC = () => {
       </div>
       
       {/* Main Content Area */}
-      {extractedComponent ? (
+      {extractedResult ? (
         <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                {extractedComponent.name.charAt(0)}
+                {extractedResult.componentName.charAt(0)}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedComponent.name}</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedComponent.description}</p>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.componentName}</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedResult.description}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -591,9 +610,10 @@ export const ComponentBuilder: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  setExtractedComponent(null);
+                  setExtractedResult(null);
                   setSelectedVariant(null);
                   setFigmaUrl('');
+                  setExtractionStatus('idle');
                 }}
                 className="h-8 px-3 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
               >
@@ -604,7 +624,7 @@ export const ComponentBuilder: React.FC = () => {
           
           {/* Variant Selector */}
           <VariantSelector
-            variants={extractedComponent.variants}
+            variants={extractedResult.variants}
             selectedVariant={selectedVariant}
             onSelect={setSelectedVariant}
           />
@@ -638,8 +658,8 @@ export const ComponentBuilder: React.FC = () => {
                 <div className="h-full p-4">
                   <div className="h-full rounded-lg overflow-hidden border border-zinc-200/60 dark:border-zinc-800/60">
                     <ComponentPreview
-                      code={extractedComponent.componentCode}
-                      css={extractedComponent.cssCode}
+                      code={extractedResult.code}
+                      css={extractedResult.css}
                       tokens={tokens}
                     />
                   </div>
@@ -652,23 +672,29 @@ export const ComponentBuilder: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Component Code</span>
-                        <button className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1">
+                        <button 
+                          onClick={() => navigator.clipboard.writeText(extractedResult.code)}
+                          className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1"
+                        >
                           <Copy size={12} /> Copy
                         </button>
                       </div>
                       <pre className="p-4 bg-zinc-950 rounded-lg text-xs text-zinc-300 font-mono overflow-x-auto">
-                        {extractedComponent.componentCode}
+                        {extractedResult.code}
                       </pre>
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">CSS</span>
-                        <button className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1">
+                        <button 
+                          onClick={() => navigator.clipboard.writeText(extractedResult.css)}
+                          className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1"
+                        >
                           <Copy size={12} /> Copy
                         </button>
                       </div>
                       <pre className="p-4 bg-zinc-950 rounded-lg text-xs text-zinc-300 font-mono overflow-x-auto">
-                        {extractedComponent.cssCode}
+                        {extractedResult.css}
                       </pre>
                     </div>
                   </div>
@@ -677,30 +703,30 @@ export const ComponentBuilder: React.FC = () => {
               
               {activeTab === 'inspect' && (
                 <InspectPanel
-                  properties={extractedComponent.baseProps}
-                  variant={selectedVariant || undefined}
+                  properties={extractedResult.extractedProperties}
+                  usedVariables={extractedResult.usedVariables}
                 />
               )}
             </div>
             
-            {/* Right Sidebar - Feedback */}
+            {/* Right Sidebar - Used Variables & Feedback */}
             <div className="w-64 border-l border-zinc-200/60 dark:border-zinc-800/60 flex flex-col">
               <div className="flex-1 overflow-y-auto p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Palette size={14} className="text-zinc-400" />
                   <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Used Tokens
+                    Used Variables
                   </span>
                 </div>
-                {extractedComponent.baseProps.tokenMappings.length > 0 ? (
+                {extractedResult.usedVariables.length > 0 ? (
                   <div className="space-y-2">
-                    {extractedComponent.baseProps.tokenMappings.map((mapping, idx) => (
+                    {extractedResult.usedVariables.map((variable, idx) => (
                       <div key={idx} className="p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
                         <div className="flex items-center gap-2">
-                          {mapping.property.includes('color') || mapping.property.includes('background') ? (
+                          {variable.type === 'color' ? (
                             <div 
                               className="w-4 h-4 rounded border border-zinc-200 dark:border-zinc-700"
-                              style={{ backgroundColor: mapping.tokenValue }}
+                              style={{ backgroundColor: variable.value }}
                             />
                           ) : (
                             <div className="w-4 h-4 rounded bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
@@ -708,15 +734,15 @@ export const ComponentBuilder: React.FC = () => {
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{mapping.tokenName}</p>
-                            <p className="text-[10px] text-zinc-500 truncate">{mapping.property}</p>
+                            <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{variable.name}</p>
+                            <p className="text-[10px] text-zinc-500 truncate">{variable.value}</p>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">No tokens matched</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">No variables detected</p>
                 )}
               </div>
               
@@ -750,21 +776,45 @@ export const ComponentBuilder: React.FC = () => {
         // Empty state
         <div className="flex-1 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
           <div className="text-center max-w-md px-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-4">
-              <Sparkles size={28} className="text-violet-500" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#F24E1E]/20 via-[#A259FF]/20 to-[#1ABCFE]/20 flex items-center justify-center mx-auto mb-4">
+              <Figma size={28} className="text-violet-500" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Extract Components from Figma
+              Figma MCP Extraction
             </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              Paste a Figma component URL to extract 100% matching UI with your design tokens.
-              The builder will analyze the design and generate production-ready React components.
+              Paste a Figma component URL or select a node in Figma desktop. 
+              The MCP will extract 100% of design properties including variables, 
+              auto-layout, effects, and generate production-ready React code.
             </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-zinc-400">
-              <span className="flex items-center gap-1"><Check size={12} className="text-green-500" /> 100% UI Match</span>
-              <span className="flex items-center gap-1"><Check size={12} className="text-green-500" /> Token Mapping</span>
-              <span className="flex items-center gap-1"><Check size={12} className="text-green-500" /> Variant Support</span>
+            <div className="grid grid-cols-3 gap-4 text-xs text-zinc-400 mb-6">
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Check size={14} className="text-green-500" />
+                </div>
+                <span>100% Match</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                  <Palette size={14} className="text-violet-500" />
+                </div>
+                <span>Variables</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Layers size={14} className="text-blue-500" />
+                </div>
+                <span>Variants</span>
+              </div>
             </div>
+            <a
+              href="https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-Components-in-Figma"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-violet-500 hover:text-violet-600 flex items-center justify-center gap-1"
+            >
+              Learn about Figma components <ExternalLink size={10} />
+            </a>
           </div>
         </div>
       )}

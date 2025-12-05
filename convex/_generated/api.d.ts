@@ -12,6 +12,7 @@ import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
 import type * as components_ from "../components.js";
 import type * as figma from "../figma.js";
+import type * as figmaExtraction from "../figmaExtraction.js";
 import type * as github from "../github.js";
 import type * as projects from "../projects.js";
 import type * as rateLimit from "../rateLimit.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   components: typeof components_;
   figma: typeof figma;
+  figmaExtraction: typeof figmaExtraction;
   github: typeof github;
   projects: typeof projects;
   rateLimit: typeof rateLimit;

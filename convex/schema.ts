@@ -182,4 +182,24 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_user", ["userId"])
     .index("by_expires", ["expiresAt"]),
+
+  // Figma Extractions - stores extraction requests and results
+  figmaExtractions: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    figmaUrl: v.optional(v.string()),
+    nodeId: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    result: v.optional(v.any()), // Extracted component data
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_user", ["userId"]),
 });
