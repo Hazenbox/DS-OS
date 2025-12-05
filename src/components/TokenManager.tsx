@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, X, FileJson, Check, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
+import { Trash2, Edit2, Save, Upload, Download, X, FileJson, Check, MoreVertical, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
 import { TableSkeleton, FileSkeleton } from './LoadingSpinner';
@@ -353,7 +353,6 @@ const parseTokensFromJSON = (json: any): ParsedToken[] => {
 export const TokenManager: React.FC = () => {
     const { projectId, userId } = useProject();
     const [activeTab, setActiveTab] = useState<TokenType>('color');
-    const [showFiles, setShowFiles] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -364,6 +363,17 @@ export const TokenManager: React.FC = () => {
     const [editingFileId, setEditingFileId] = useState<string | null>(null);
     const [editingFileName, setEditingFileName] = useState('');
     const [fileMenuOpen, setFileMenuOpen] = useState<string | null>(null);
+    
+    // Close menu on outside click
+    useEffect(() => {
+        const handleClickOutside = () => {
+            if (fileMenuOpen) {
+                setFileMenuOpen(null);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [fileMenuOpen]);
     
     // Import preview state
     const [showPreview, setShowPreview] = useState(false);
@@ -611,24 +621,6 @@ export const TokenManager: React.FC = () => {
                             onChange={handleFileSelect}
                         />
                         
-                        {/* Add Token */}
-                        <button 
-                            onClick={() => setShowAddModal(true)}
-                            title="Add Token"
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 border border-violet-600 rounded hover:bg-violet-700"
-                        >
-                            <Plus size={14} /> Add
-                        </button>
-                        
-                        {/* Import JSON */}
-                        <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            title="Import JSON File"
-                            className="p-1.5 text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
-                        >
-                            <Upload size={16} />
-                        </button>
-                        
                         {/* Export */}
                         <button 
                             onClick={() => setShowExportModal(true)}
@@ -637,16 +629,6 @@ export const TokenManager: React.FC = () => {
                         >
                             <Download size={16} />
                         </button>
-                        
-                        {/* Files Toggle */}
-                        <button 
-                            onClick={() => setShowFiles(!showFiles)}
-                            title="Toggle File Panel"
-                            className={`p-1.5 border rounded ${showFiles ? 'bg-violet-600 text-white border-transparent' : 'text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border-zinc-200/60 dark:border-zinc-700/60 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white'}`}
-                        >
-                            <FileJson size={16} />
-                        </button>
-                        
                     </div>
                 </div>
 
@@ -705,9 +687,9 @@ export const TokenManager: React.FC = () => {
                                         {filteredTokens.map(token => (
                                             <tr key={token._id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                                                 {activeTab !== 'typography' && (
-                                                    <td className="px-4 py-2">
+                                                <td className="px-4 py-2">
                                                         {renderTokenPreview(token.type as TokenType, token.value)}
-                                                    </td>
+                                                </td>
                                                 )}
                                                 <td className="px-4 py-2 font-medium text-zinc-900 dark:text-white">
                                                     <span className="truncate block max-w-[250px]" title={token.name}>{token.name}</span>
@@ -741,16 +723,19 @@ export const TokenManager: React.FC = () => {
             </div>
 
             {/* Files Side Panel */}
-            {showFiles && (
-                <div className="w-72 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col transition-all">
-                    <div className="px-6 py-[29px] border-b border-zinc-200/60 dark:border-zinc-800/60">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Source Files</h3>
-                            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                                {tokenFiles?.length || 0} files
-                            </span>
-                        </div>
+            <div className="w-72 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col">
+                <div className="px-6 py-[29px] border-b border-zinc-200/60 dark:border-zinc-800/60">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Source Files</h3>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Upload JSON File"
+                            className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                        >
+                            <Upload size={14} />
+                        </button>
                     </div>
+                </div>
 
                     <div className="flex-1 overflow-y-auto p-4">
                         {/* Loading State */}
@@ -835,32 +820,35 @@ export const TokenManager: React.FC = () => {
                                                         
                                                         <div className="relative">
                                                             <button
-                                                                onClick={() => setFileMenuOpen(fileMenuOpen === file._id ? null : file._id)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setFileMenuOpen(fileMenuOpen === file._id ? null : file._id);
+                                                                }}
                                                                 className="p-1 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50 text-zinc-400"
                                                             >
                                                                 <MoreVertical size={14} />
                                                             </button>
                                                             
                                                             {fileMenuOpen === file._id && (
-                                                                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-10">
+                                                                <div className="absolute right-0 top-full mt-1 w-24 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-10">
                                                                     <button
                                                                         onClick={() => {
                                                                             setEditingFileId(file._id);
                                                                             setEditingFileName(file.name);
                                                                             setFileMenuOpen(null);
                                                                         }}
-                                                                        className="w-full px-3 py-1.5 text-left text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                                                                        className="w-full px-3 py-1.5 text-left text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                                                     >
-                                                                        <Pencil size={12} /> Rename
+                                                                        Rename
                                                                     </button>
                                                                     <button
                                                                         onClick={() => {
                                                                             handleFileDelete(file._id);
                                                                             setFileMenuOpen(null);
                                                                         }}
-                                                                        className="w-full px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2"
+                                                                        className="w-full px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                                                                     >
-                                                                        <Trash2 size={12} /> Delete
+                                                                        Delete
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -871,18 +859,10 @@ export const TokenManager: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
-                                
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full mt-2 p-2 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-500 dark:hover:border-zinc-500 transition-colors flex items-center justify-center gap-2 text-xs"
-                                >
-                                    <Upload size={12} /> Upload More
-                                </button>
                             </div>
                         )}
                     </div>
                 </div>
-            )}
 
             {/* Import Preview Modal */}
             {showPreview && (
