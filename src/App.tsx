@@ -238,7 +238,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <ProjectProvider>
+    <ProjectProvider userId={user.email}>
       <AppContent 
         user={user} 
         onLogout={handleLogout}

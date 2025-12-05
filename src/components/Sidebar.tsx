@@ -30,9 +30,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   const projectMenuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Convex queries and mutations
-  const projects = useQuery(api.projects.list) || [];
-  const activeProject = useQuery(api.projects.getActive);
+  // Convex queries and mutations - scoped to user
+  const userId = user?.email;
+  const projects = useQuery(api.projects.list, userId ? { userId } : "skip") || [];
+  const activeProject = useQuery(api.projects.getActive, userId ? { userId } : "skip");
   const createProject = useMutation(api.projects.create);
   const setActiveProject = useMutation(api.projects.setActive);
 
@@ -61,13 +62,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   }, [isCreating]);
 
   const handleCreateProject = async () => {
-    if (!newProjectName.trim() || isSubmitting) return;
+    if (!newProjectName.trim() || isSubmitting || !userId) return;
     
     setIsSubmitting(true);
     try {
       await createProject({ 
         name: newProjectName.trim(),
-        userEmail: user?.email 
+        userId,
       });
       setNewProjectName('');
       setIsCreating(false);
@@ -79,8 +80,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   };
 
   const handleSelectProject = async (projectId: Id<"projects">) => {
+    if (!userId) return;
     try {
-      await setActiveProject({ id: projectId });
+      await setActiveProject({ id: projectId, userId });
       setIsProjectMenuOpen(false);
     } catch (error) {
       console.error('Failed to switch project:', error);

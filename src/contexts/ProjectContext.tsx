@@ -10,29 +10,37 @@ interface Project {
   isActive: boolean;
   createdAt: number;
   updatedAt: number;
-  createdBy?: string;
+  userId: string;
 }
 
 interface ProjectContextType {
   activeProject: Project | null | undefined;
   projectId: Id<"projects"> | undefined;
+  userId: string | undefined;
   isLoading: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextType>({
   activeProject: undefined,
   projectId: undefined,
+  userId: undefined,
   isLoading: true,
 });
 
 export const useProject = () => useContext(ProjectContext);
 
-export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const activeProject = useQuery(api.projects.getActive);
+interface ProjectProviderProps {
+  children: ReactNode;
+  userId: string;
+}
+
+export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children, userId }) => {
+  const activeProject = useQuery(api.projects.getActive, { userId });
   
   const value: ProjectContextType = {
     activeProject,
     projectId: activeProject?._id,
+    userId,
     isLoading: activeProject === undefined,
   };
 
@@ -42,4 +50,3 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     </ProjectContext.Provider>
   );
 };
-

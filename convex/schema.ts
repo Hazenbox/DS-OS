@@ -97,15 +97,17 @@ export default defineSchema({
     isDefault: v.boolean(),
   }).index("by_project", ["projectId"]),
 
-  // Projects
+  // Projects - scoped to user
   projects: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    createdBy: v.optional(v.string()),
-  }).index("by_active", ["isActive"]),
+    userId: v.string(), // Owner's email
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"]),
 
   // Users
   users: defineTable({
