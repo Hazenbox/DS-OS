@@ -65,10 +65,15 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     const [isFigmaSaving, setIsFigmaSaving] = useState(false);
     const [figmaSaved, setFigmaSaved] = useState(false);
 
+    // Clear data
+    const [isClearing, setIsClearing] = useState(false);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+
     // Convex
     const setThemeSetting = useMutation(api.settings.set);
     const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus);
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
+    const clearAllData = useMutation(api.seed.clearAllData);
 
     const handleThemeModeChange = async (mode: ThemeMode) => {
         onThemeModeChange(mode);
@@ -356,10 +361,48 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                         <p className="text-sm text-red-600/70 dark:text-red-400/70 mb-4">
                             These actions are irreversible. Please proceed with caution.
                         </p>
-                        <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-transparent border border-red-300 dark:border-red-500/30 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10">
-                            <Trash2 size={14} />
-                            Clear All Data
-                        </button>
+                        
+                        {!showClearConfirm ? (
+                            <button 
+                                onClick={() => setShowClearConfirm(true)}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-transparent border border-red-300 dark:border-red-500/30 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10"
+                            >
+                                <Trash2 size={14} />
+                                Clear All Data
+                            </button>
+                        ) : (
+                            <div className="space-y-3">
+                                <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                    Are you sure? This will delete all tokens, components, releases, and activity.
+                                </p>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={async () => {
+                                            setIsClearing(true);
+                                            try {
+                                                await clearAllData();
+                                                setShowClearConfirm(false);
+                                            } catch (error) {
+                                                console.error('Failed to clear data:', error);
+                                            } finally {
+                                                setIsClearing(false);
+                                            }
+                                        }}
+                                        disabled={isClearing}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                        {isClearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                        {isClearing ? 'Clearing...' : 'Yes, Clear Everything'}
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowClearConfirm(false)}
+                                        className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
