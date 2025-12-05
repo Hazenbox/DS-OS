@@ -1,7 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import { ViewState } from '../types';
-import { Hexagon, ChevronDown, LogOut } from 'lucide-react';
+import { Hexagon, ChevronDown, LogOut, Plus, Check, Loader2, FolderOpen } from 'lucide-react';
+import { Id } from '../../convex/_generated/dataModel';
 
 interface User {
   userId: string;
@@ -18,25 +20,72 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
+  const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close user menu when clicking outside
+  // Convex queries and mutations
+  const projects = useQuery(api.projects.list) || [];
+  const activeProject = useQuery(api.projects.getActive);
+  const createProject = useMutation(api.projects.create);
+  const setActiveProject = useMutation(api.projects.setActive);
+
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
+      if (projectMenuRef.current && !projectMenuRef.current.contains(event.target as Node)) {
+        setIsProjectMenuOpen(false);
+        setIsCreating(false);
+        setNewProjectName('');
+      }
     };
 
-    if (isUserMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus input when creating
+  useEffect(() => {
+    if (isCreating && inputRef.current) {
+      inputRef.current.focus();
     }
+  }, [isCreating]);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isUserMenuOpen]);
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim() || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    try {
+      await createProject({ 
+        name: newProjectName.trim(),
+        userEmail: user?.email 
+      });
+      setNewProjectName('');
+      setIsCreating(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSelectProject = async (projectId: Id<"projects">) => {
+    try {
+      await setActiveProject({ id: projectId });
+      setIsProjectMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to switch project:', error);
+    }
+  };
 
   const navItems: { id: ViewState; label: string }[] = [
     { id: 'dashboard', label: 'Overview' },
@@ -58,6 +107,95 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 <h1 className="font-bold text-sm tracking-tight text-primary">DS-OS</h1>
                 <p className="text-xs text-muted">Design System Platform</p>
             </div>
+        </div>
+
+        {/* Project Dropdown */}
+        <div className="relative" ref={projectMenuRef}>
+          <button 
+            onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
+            className="w-full h-8 flex items-center justify-between px-3 text-sm font-medium text-primary bg-black/[0.08] dark:bg-white/[0.05] rounded-lg border border-transparent dark:border-white/10 transition-all duration-200 ease-in-out hover:bg-black/10 dark:hover:bg-white/[0.08]"
+          >
+            <span className="truncate">
+              {activeProject?.name || 'Select Project'}
+            </span>
+            <ChevronDown size={14} className={`text-primary/70 transition-transform flex-shrink-0 ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {isProjectMenuOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
+              <div className="px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Projects
+              </div>
+              
+              {projects.length === 0 && !isCreating && (
+                <div className="px-3 py-4 text-center">
+                  <FolderOpen size={24} className="mx-auto mb-2 text-zinc-400 dark:text-zinc-500" />
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">No projects yet</p>
+                </div>
+              )}
+              
+              {projects.map((project) => (
+                <button 
+                  key={project._id}
+                  onClick={() => handleSelectProject(project._id)}
+                  className="w-full text-left px-3 py-2 text-sm text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
+                >
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${project.isActive ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+                  <span className="truncate flex-1">{project.name}</span>
+                  {project.isActive && <Check size={14} className="text-green-500 flex-shrink-0" />}
+                </button>
+              ))}
+              
+              <div className="h-px bg-zinc-200/60 dark:bg-zinc-700/60 my-1" />
+              
+              {isCreating ? (
+                <div className="px-3 py-2">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateProject();
+                      if (e.key === 'Escape') {
+                        setIsCreating(false);
+                        setNewProjectName('');
+                      }
+                    }}
+                    placeholder="Project name..."
+                    className="w-full px-2 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-violet-500"
+                    disabled={isSubmitting}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleCreateProject}
+                      disabled={!newProjectName.trim() || isSubmitting}
+                      className="flex-1 px-2 py-1 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                    >
+                      {isSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                      Create
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewProjectName('');
+                      }}
+                      className="px-2 py-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsCreating(true)}
+                  className="w-full text-left px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
+                >
+                  <Plus size={14} /> Create Project
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

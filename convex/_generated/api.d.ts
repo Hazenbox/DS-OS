@@ -12,6 +12,7 @@ import type * as activity from "../activity.js";
 import type * as auth from "../auth.js";
 import type * as components_ from "../components.js";
 import type * as figma from "../figma.js";
+import type * as projects from "../projects.js";
 import type * as releases from "../releases.js";
 import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   components: typeof components_;
   figma: typeof figma;
+  projects: typeof projects;
   releases: typeof releases;
   seed: typeof seed;
   settings: typeof settings;

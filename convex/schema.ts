@@ -81,6 +81,16 @@ export default defineSchema({
     isDefault: v.boolean(),
   }),
 
+  // Projects
+  projects: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    createdBy: v.optional(v.string()), // User email
+  }).index("by_active", ["isActive"]),
+
   // Users
   users: defineTable({
     email: v.string(),
