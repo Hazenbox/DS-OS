@@ -2,25 +2,8 @@ import React, { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
-import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Filter, Plus, Edit2, Trash2, Download, Upload, Rocket } from 'lucide-react';
+import { CheckCircle, GitBranch, Package, Palette, Clock } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
-
-// Activity type badge colors and icons
-const ACTION_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  create: { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10', icon: <Plus size={10} />, label: 'Created' },
-  update: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', icon: <Edit2 size={10} />, label: 'Updated' },
-  delete: { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: <Trash2 size={10} />, label: 'Deleted' },
-  import: { color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10', icon: <Upload size={10} />, label: 'Imported' },
-  download: { color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10', icon: <Download size={10} />, label: 'Exported' },
-  release: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', icon: <Rocket size={10} />, label: 'Released' },
-};
-
-const TARGET_CONFIG: Record<string, { color: string; bg: string }> = {
-  token: { color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-500/10' },
-  component: { color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-500/10' },
-  release: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
-  system: { color: 'text-zinc-600 dark:text-zinc-400', bg: 'bg-zinc-500/10' },
-};
 
 // Relative time formatter
 const getRelativeTime = (timestamp: number): string => {
@@ -61,54 +44,67 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
   </div>
 );
 
+// Format activity into readable sentence
+const formatActivitySentence = (activity: { user: string; action: string; target: string; targetType: string }): string => {
+  // Extract clean name from email or use as-is
+  const userName = activity.user.includes('@') 
+    ? activity.user.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : activity.user;
+  
+  // Extract the actual item name from target (e.g., "Token: primary" -> "primary")
+  const itemName = activity.target.includes(':') 
+    ? activity.target.split(':')[1].trim()
+    : activity.target;
+
+  const actionVerbs: Record<string, string> = {
+    create: 'created',
+    update: 'updated',
+    delete: 'deleted',
+    import: 'imported',
+    download: 'exported',
+    release: 'released',
+  };
+
+  const verb = actionVerbs[activity.action] || activity.action;
+  
+  return `"${itemName}" was ${verb} by ${userName}`;
+};
+
 // Activity Item Component
 const ActivityItem: React.FC<{ 
   activity: { id: string; user: string; action: string; target: string; targetType: string; timestamp: number };
   isLast: boolean;
 }> = ({ activity, isLast }) => {
-  const actionConfig = ACTION_CONFIG[activity.action] || ACTION_CONFIG.update;
-  const targetConfig = TARGET_CONFIG[activity.targetType] || TARGET_CONFIG.system;
+  const dotColors: Record<string, string> = {
+    create: 'bg-green-500',
+    update: 'bg-blue-500',
+    delete: 'bg-red-500',
+    import: 'bg-violet-500',
+    download: 'bg-cyan-500',
+    release: 'bg-amber-500',
+  };
+  
+  const dotColor = dotColors[activity.action] || 'bg-zinc-400';
   
   return (
-    <div className="relative group">
+    <div className="relative">
       {/* Timeline connector */}
       {!isLast && (
-        <div className="absolute left-[11px] top-8 w-px h-[calc(100%-8px)] bg-zinc-200 dark:bg-zinc-700/50" />
+        <div className="absolute left-[5px] top-4 w-px h-[calc(100%+4px)] bg-zinc-200 dark:bg-zinc-800" />
       )}
       
-      <div className="flex gap-3 p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
+      <div className="flex gap-3 py-2 group">
         {/* Timeline dot */}
-        <div className={`w-6 h-6 rounded-full ${actionConfig.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ring-4 ring-white dark:ring-zinc-900`}>
-          <span className={actionConfig.color}>{actionConfig.icon}</span>
-        </div>
+        <div className={`w-[11px] h-[11px] rounded-full ${dotColor} flex-shrink-0 mt-1 ring-2 ring-white dark:ring-zinc-900`} />
         
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm text-zinc-900 dark:text-white font-medium truncate">
-                {activity.target}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${actionConfig.bg} ${actionConfig.color}`}>
-                  {actionConfig.label}
-                </span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${targetConfig.bg} ${targetConfig.color}`}>
-                  {activity.targetType}
-                </span>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
-          </div>
-          
-          <div className="flex items-center gap-2 mt-2">
-            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-[9px] font-bold text-white">
-              {activity.user.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{activity.user}</span>
-            <span className="text-zinc-300 dark:text-zinc-600">·</span>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">{getRelativeTime(activity.timestamp)}</span>
-          </div>
+        <div className="flex-1 min-w-0 -mt-0.5">
+          <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+            {formatActivitySentence(activity)}
+          </p>
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+            {getRelativeTime(activity.timestamp)}
+          </p>
         </div>
       </div>
     </div>
