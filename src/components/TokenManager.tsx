@@ -8,13 +8,15 @@ import { TokenExport } from './TokenExport';
 import { FigmaImport } from './FigmaImport';
 import { useProject } from '../contexts/ProjectContext';
 
-const TABS: { id: TokenType; label: string }[] = [
+const TABS: { id: TokenType | 'all'; label: string }[] = [
+    { id: 'all', label: 'All' },
     { id: 'color', label: 'Colors' },
     { id: 'typography', label: 'Typography' },
     { id: 'spacing', label: 'Spacing' },
     { id: 'sizing', label: 'Sizing' },
     { id: 'radius', label: 'Shape' },
     { id: 'shadow', label: 'Shadows' },
+    { id: 'unknown', label: 'Other' },
 ];
 
 // File type from Convex
@@ -31,7 +33,7 @@ interface TokenFile {
 
 export const TokenManager: React.FC = () => {
     const { projectId, userId } = useProject();
-    const [activeTab, setActiveTab] = useState<TokenType>('color');
+    const [activeTab, setActiveTab] = useState<TokenType | 'all'>('all');
     const [showFiles, setShowFiles] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,7 +67,9 @@ export const TokenManager: React.FC = () => {
     const removeFile = useMutation(api.tokenFiles.remove);
 
     // Filter tokens by active tab
-    const filteredTokens = (tokens || []).filter(t => t.type === activeTab);
+    const filteredTokens = activeTab === 'all' 
+        ? (tokens || []) 
+        : (tokens || []).filter(t => t.type === activeTab);
 
     const handleEdit = (token: ConvexToken) => {
         setEditingId(token._id);
@@ -95,12 +99,15 @@ export const TokenManager: React.FC = () => {
         if (!newToken.name || !newToken.value || !projectId || !userId) return;
         
         try {
+            // Determine token type - if on 'all' tab, default to 'unknown'
+            const tokenType: TokenType = activeTab === 'all' ? 'unknown' : activeTab;
+            
             await createToken({
                 projectId,
                 userId,
                 name: newToken.name,
                 value: newToken.value,
-                type: activeTab,
+                type: tokenType,
                 description: newToken.description || undefined,
             });
             setNewToken({ name: '', value: '', description: '' });
@@ -110,7 +117,77 @@ export const TokenManager: React.FC = () => {
         }
     };
 
-    const flattenTokens = (obj: any, prefix: string = '', type: TokenType = 'unknown'): Array<{
+    // Detect token type from value
+    const detectTypeFromValue = (value: string): TokenType | null => {
+        const v = value.trim().toLowerCase();
+        
+        // Color patterns
+        if (/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)) return 'color';
+        if (/^rgb(a)?\s*\(/.test(v)) return 'color';
+        if (/^hsl(a)?\s*\(/.test(v)) return 'color';
+        
+        // Shadow patterns
+        if (/^\d+px\s+\d+px\s+\d+px/.test(v)) return 'shadow';
+        if (v.includes('box-shadow') || v.includes('drop-shadow')) return 'shadow';
+        
+        // Spacing/sizing patterns (px, rem, em values)
+        if (/^\d+(\.\d+)?(px|rem|em|%)$/.test(v)) {
+            // Could be spacing or sizing - default to spacing
+            return 'spacing';
+        }
+        
+        // Typography patterns
+        if (/^\d+(\.\d+)?(px|rem|em|pt)$/.test(v) && parseFloat(v) >= 8 && parseFloat(v) <= 120) {
+            // Font sizes typically 8-120
+            return 'typography';
+        }
+        if (/^(normal|bold|lighter|bolder|\d{3})$/.test(v)) return 'typography';
+        if (/^[\d.]+$/.test(v) && parseFloat(v) >= 0.5 && parseFloat(v) <= 3) {
+            // Line heights typically 0.5-3
+            return 'typography';
+        }
+        
+        return null;
+    };
+
+    // Detect token type from key name
+    const detectTypeFromKey = (key: string): TokenType | null => {
+        const lowerKey = key.toLowerCase();
+        
+        // Color keywords
+        if (/color|colours?|fill|stroke|background|bg|foreground|fg|primary|secondary|accent|brand|neutral|gray|grey|red|blue|green|yellow|orange|purple|pink|teal|cyan/.test(lowerKey)) {
+            return 'color';
+        }
+        
+        // Spacing keywords
+        if (/space|spacing|gap|margin|padding|inset/.test(lowerKey)) {
+            return 'spacing';
+        }
+        
+        // Sizing keywords
+        if (/size|sizing|width|height|min|max/.test(lowerKey)) {
+            return 'sizing';
+        }
+        
+        // Typography keywords
+        if (/font|typography|text|letter|line|paragraph|heading|body|display|caption/.test(lowerKey)) {
+            return 'typography';
+        }
+        
+        // Radius keywords
+        if (/radius|radii|corner|rounded|border-radius/.test(lowerKey)) {
+            return 'radius';
+        }
+        
+        // Shadow keywords
+        if (/shadow|elevation|depth/.test(lowerKey)) {
+            return 'shadow';
+        }
+        
+        return null;
+    };
+
+    const flattenTokens = (obj: any, prefix: string = '', inheritedType: TokenType = 'unknown'): Array<{
         name: string;
         value: string;
         type: TokenType;
@@ -127,24 +204,55 @@ export const TokenManager: React.FC = () => {
             const val = obj[key];
             const newKey = prefix ? `${prefix}-${key}` : key;
             
-            // Infer type
-            let currentType = type;
-            const lowerKey = key.toLowerCase();
-            if (['color', 'colors'].includes(lowerKey)) currentType = 'color';
-            if (['space', 'spacing'].includes(lowerKey)) currentType = 'spacing';
-            if (['font', 'typography', 'text'].includes(lowerKey)) currentType = 'typography';
-            if (['radius', 'radii'].includes(lowerKey)) currentType = 'radius';
-            if (['shadow', 'shadows'].includes(lowerKey)) currentType = 'shadow';
-            if (['size', 'sizing'].includes(lowerKey)) currentType = 'sizing';
+            // Try to detect type from key name first
+            const keyType = detectTypeFromKey(key) || detectTypeFromKey(newKey);
+            let currentType = keyType || inheritedType;
 
             if (typeof val === 'string' || typeof val === 'number') {
-                 result.push({
-                     name: newKey,
-                     value: val.toString(),
-                     type: currentType
-                 });
-            } else if (typeof val === 'object') {
-                result.push(...flattenTokens(val, newKey, currentType));
+                const strVal = val.toString();
+                
+                // If still unknown, try to detect from value
+                if (currentType === 'unknown') {
+                    const valueType = detectTypeFromValue(strVal);
+                    if (valueType) currentType = valueType;
+                }
+                
+                result.push({
+                    name: newKey,
+                    value: strVal,
+                    type: currentType
+                });
+            } else if (typeof val === 'object' && val !== null) {
+                // Handle Figma-style $value objects
+                if (val.$value !== undefined) {
+                    const strVal = val.$value.toString();
+                    if (currentType === 'unknown') {
+                        const valueType = detectTypeFromValue(strVal);
+                        if (valueType) currentType = valueType;
+                    }
+                    result.push({
+                        name: newKey,
+                        value: strVal,
+                        type: currentType,
+                        description: val.$description,
+                    });
+                } else if (val.value !== undefined && typeof val.value !== 'object') {
+                    // Handle {value: "...", description: "..."} format
+                    const strVal = val.value.toString();
+                    if (currentType === 'unknown') {
+                        const valueType = detectTypeFromValue(strVal);
+                        if (valueType) currentType = valueType;
+                    }
+                    result.push({
+                        name: newKey,
+                        value: strVal,
+                        type: currentType,
+                        description: val.description,
+                    });
+                } else {
+                    // Recurse into nested objects
+                    result.push(...flattenTokens(val, newKey, currentType));
+                }
             }
         }
         return result;
@@ -165,6 +273,13 @@ export const TokenManager: React.FC = () => {
                     const json = JSON.parse(content);
                     const parsedTokens = flattenTokens(json);
                     
+                    console.log(`[TokenManager] Parsed ${parsedTokens.length} tokens from ${file.name}:`, parsedTokens.slice(0, 5));
+                    
+                    if (parsedTokens.length === 0) {
+                        alert(`No tokens found in ${file.name}. Check the JSON structure.`);
+                        return;
+                    }
+                    
                     // Create the file record first
                     const fileId = await createFile({
                         projectId,
@@ -175,6 +290,8 @@ export const TokenManager: React.FC = () => {
                         uploadedBy: userId,
                     });
                     
+                    console.log(`[TokenManager] Created file record:`, fileId);
+                    
                     // Then import the tokens linked to this file
                     await bulkImport({ 
                         projectId,
@@ -183,9 +300,11 @@ export const TokenManager: React.FC = () => {
                         sourceFileId: fileId,
                         clearExisting: false 
                     });
+                    
+                    console.log(`[TokenManager] Tokens imported successfully`);
                 } catch (err) {
-                    console.error(err);
-                    alert(`Invalid JSON format in file: ${file.name}`);
+                    console.error('[TokenManager] Upload error:', err);
+                    alert(`Error processing ${file.name}: ${err instanceof Error ? err.message : 'Invalid JSON'}`);
                 }
             };
             reader.readAsText(file);
@@ -371,7 +490,9 @@ export const TokenManager: React.FC = () => {
                     <div className="flex-1 overflow-y-auto p-6">
                         {filteredTokens.length === 0 && (
                             <div className="w-full py-12 text-center text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
-                                No tokens found for {activeTab}. Import a JSON file or add manually.
+                                {activeTab === 'all' 
+                                    ? 'No tokens found. Upload a JSON file to get started.' 
+                                    : `No ${activeTab} tokens found. Check the "All" or "Other" tabs.`}
                             </div>
                         )}
 
