@@ -214,9 +214,9 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-zinc-200 dark:border-zinc-800">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-zinc-200/60 dark:border-zinc-800/60">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-between items-center p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
                     <div>
                         <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Export Tokens</h3>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">{tokens.length} tokens ready to export</p>
@@ -227,7 +227,7 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
                 </div>
 
                 {/* Format Tabs */}
-                <div className="flex gap-1 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                <div className="flex gap-1 p-3 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50">
                     {formats.map(f => (
                         <button
                             key={f.id}
@@ -246,7 +246,7 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
 
                 {/* Options */}
                 {(activeFormat === 'css' || activeFormat === 'scss') && (
-                    <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center gap-3">
+                    <div className="px-4 py-2 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center gap-3">
                         <label className="text-xs text-zinc-500 dark:text-zinc-400">Variable prefix:</label>
                         <input
                             type="text"
@@ -265,7 +265,7 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 p-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-end gap-2 p-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
                     <button
                         onClick={handleCopy}
                         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700"

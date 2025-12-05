@@ -10,7 +10,7 @@ interface DashboardProps {
 }
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; delta?: string }> = ({ title, value, icon, delta }) => (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 p-4 rounded-lg">
         <div className="flex justify-between items-start mb-2">
             <span className="text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">{title}</span>
             <span className="text-zinc-400 dark:text-zinc-500">{icon}</span>
@@ -40,7 +40,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
 
   return (
     <div className="flex flex-col h-full">
-        <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+        <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
             <div>
                 <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Overview</h2>
             </div>
@@ -78,7 +78,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
 
                     <div className="space-y-4">
                     <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Recent Activity</h3>
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-4">
                             {recentActivity.length === 0 ? (
                             <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-8">No recent activity</p>
                             ) : (
@@ -101,7 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                 {/* Component Overview */}
                 <div className="space-y-4">
                     <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Component Status</h3>
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                             <thead className="bg-zinc-50 dark:bg-zinc-800/50">
                                 <tr>
@@ -110,7 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                                     <th className="px-4 py-3 text-left font-medium text-zinc-500 dark:text-zinc-400">Version</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                            <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
                                 {components.map(comp => (
                                     <tr key={comp.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                                         <td className="px-4 py-3 font-medium text-zinc-900 dark:text-white">{comp.name}</td>

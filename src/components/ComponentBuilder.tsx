@@ -210,8 +210,8 @@ export default NewComponent;`,
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: List & Controls */}
-            <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900">
+            <div className="w-72 border-r border-zinc-200/60 dark:border-zinc-800/60 flex flex-col">
+                <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900">
                     <div>
                         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">AI-powered generation</p>
@@ -236,7 +236,7 @@ export default NewComponent;`,
                         <div 
                             key={c._id} 
                             onClick={() => handleSelectComponent(c._id)}
-                            className={`p-3 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 group ${selectedComponentId === c._id ? 'bg-zinc-100 dark:bg-zinc-800 border-l-2 border-l-violet-500' : ''}`}
+                            className={`p-3 border-b border-zinc-200/60 dark:border-zinc-800/60 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 group ${selectedComponentId === c._id ? 'bg-zinc-100 dark:bg-zinc-800 border-l-2 border-l-violet-500' : ''}`}
                         >
                             <div className="flex justify-between items-start">
                                 <div className="font-medium text-sm text-zinc-900 dark:text-white">{c.name}</div>
@@ -280,7 +280,7 @@ export default NewComponent;`,
             {selectedComponent ? (
                 <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
                     {/* Header Tabs */}
-                    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-3 justify-between">
+                    <div className="h-12 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center px-3 justify-between">
                         <div className="flex gap-1 h-full items-center">
                             <button 
                                 onClick={() => setActiveTab('code')}
@@ -328,7 +328,7 @@ export default NewComponent;`,
                     {/* Main Content */}
                     <div className="flex-1 overflow-hidden flex">
                         {/* Code/Docs Panel */}
-                        <div className={`flex flex-col ${showPreview ? 'w-1/2 border-r border-zinc-200 dark:border-zinc-800' : 'w-full'}`}>
+                        <div className={`flex flex-col ${showPreview ? 'w-1/2 border-r border-zinc-200/60 dark:border-zinc-800/60' : 'w-full'}`}>
                             {activeTab === 'code' && (
                                 <div className="flex-1 overflow-hidden">
                                     <Editor
@@ -363,10 +363,10 @@ export default NewComponent;`,
                             )}
 
                             {/* Prompt Input */}
-                            <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
+                            <div className="p-3 border-t border-zinc-200/60 dark:border-zinc-800/60">
                                 <div className="flex gap-2 items-end">
                                     <textarea
-                                        className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white py-2.5 px-3 resize-none placeholder:text-zinc-400 focus:outline-none focus:border-violet-500 min-h-[44px] max-h-24"
+                                        className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-sm text-zinc-900 dark:text-white py-2.5 px-3 resize-none placeholder:text-zinc-400 focus:outline-none focus:border-violet-500 min-h-[44px] max-h-24"
                                         placeholder="Describe changes (e.g., 'Add hover effect with scale animation')..."
                                         value={prompt}
                                         onChange={(e) => setPrompt(e.target.value)}
@@ -405,7 +405,7 @@ export default NewComponent;`,
                 </div>
             ) : (
                 <div className="flex-1 flex items-center justify-center text-zinc-500 dark:text-zinc-400 flex-col gap-4">
-                    <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center">
                         <Zap size={24} />
                     </div>
                     <p className="text-sm">Select a component or create new to start building</p>

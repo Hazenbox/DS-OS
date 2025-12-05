@@ -124,7 +124,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Release</h2>
                 </div>
@@ -149,7 +149,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">Pipeline Status</h3>
                         
                         {activeDeploy ? (
@@ -157,7 +157,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                                 <div className="absolute left-[21px] top-2 bottom-2 w-0.5 bg-zinc-200 dark:bg-zinc-700 -z-10" />
                                 {activeDeploy.map((step, idx) => (
                                     <div key={step.step} className="flex items-center gap-4">
-                                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full p-1">{getStatusIcon(step.status)}</div>
+                                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-full p-1">{getStatusIcon(step.status)}</div>
                                         <div className="flex-1">
                                             <div className="text-sm font-medium capitalize text-zinc-900 dark:text-white">{step.step}</div>
                                             <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -177,8 +177,8 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
                     {/* Release History */}
                     {releases && releases.length > 0 && (
-                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50">
                                 <h3 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                                     <Package size={14} /> Release History
                                 </h3>
@@ -209,8 +209,8 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                         </div>
                     )}
 
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
+                        <div className="px-6 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50">
                             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Changelog Preview</h3>
                         </div>
                         <div className="p-6 font-mono text-sm text-zinc-500 dark:text-zinc-400 space-y-2">

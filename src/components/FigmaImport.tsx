@@ -212,9 +212,9 @@ export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => 
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-zinc-200 dark:border-zinc-800">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-zinc-200/60 dark:border-zinc-800/60">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-between items-center p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center">
                             <Figma size={20} className="text-white" />
@@ -386,7 +386,7 @@ export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => 
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-between items-center p-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-between items-center p-4 border-t border-zinc-200/60 dark:border-zinc-800/60">
                     <button
                         onClick={() => {
                             setPreview(null);

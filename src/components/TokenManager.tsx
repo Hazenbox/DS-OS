@@ -219,7 +219,7 @@ export const TokenManager: React.FC = () => {
     return (
         <div className="flex h-full">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                     <div>
                         <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Tokens</h2>
                     </div>
@@ -239,19 +239,19 @@ export const TokenManager: React.FC = () => {
                         </button>
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
                         >
                             <Upload size={14} /> Import JSON
                         </button>
                         <button 
                             onClick={() => setShowExportModal(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
                         >
                             <Download size={14} /> Export
                         </button>
                          <button 
                             onClick={() => setShowActivity(!showActivity)}
-                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium border rounded ${showActivity ? 'bg-violet-600 text-white border-transparent' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium border rounded ${showActivity ? 'bg-violet-600 text-white border-transparent' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-700/60 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                         >
                             <History size={14} /> Activity
                         </button>
@@ -259,14 +259,14 @@ export const TokenManager: React.FC = () => {
                 </div>
 
                 {/* Toolbar */}
-                <div className="px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between gap-4">
+                <div className="px-6 py-3 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         {/* Density Selector */}
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase">Density</span>
                             <div className="relative">
                                 <select 
-                                    className="appearance-none bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-1 pr-8 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    className="appearance-none bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded px-3 py-1 pr-8 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                     value={density}
                                     onChange={(e) => setDensity(e.target.value as any)}
                                 >
@@ -281,7 +281,7 @@ export const TokenManager: React.FC = () => {
                         {/* Dark Mode Toggle for Preview */}
                         <button 
                              onClick={() => setIsDarkModePreview(!isDarkModePreview)}
-                             className={`flex items-center gap-2 px-3 py-1 rounded text-xs border ${isDarkModePreview ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'}`}
+                             className={`flex items-center gap-2 px-3 py-1 rounded text-xs border ${isDarkModePreview ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-700/60'}`}
                         >
                             {isDarkModePreview ? <Moon size={12} /> : <Layers size={12} />}
                             {isDarkModePreview ? 'Dark Preview' : 'Light Preview'}
@@ -289,7 +289,7 @@ export const TokenManager: React.FC = () => {
                     </div>
 
                     {/* View Toggle */}
-                    <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded p-0.5 border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded p-0.5 border border-zinc-200/60 dark:border-zinc-700/60">
                         <button 
                             onClick={() => setViewMode('grid')}
                             className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
@@ -306,7 +306,7 @@ export const TokenManager: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="flex gap-1 px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                    <div className="flex gap-1 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900">
                         {TABS.map(tab => (
                             <button
                                 key={tab.id}
@@ -332,7 +332,7 @@ export const TokenManager: React.FC = () => {
                         {viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {filteredTokens.map(token => (
-                                    <div key={token._id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 hover:shadow-sm transition-shadow group">
+                                    <div key={token._id} className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-3 hover:shadow-sm transition-shadow group">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-3">
                                                 {renderPreview(token)}
@@ -343,11 +343,11 @@ export const TokenManager: React.FC = () => {
                                             </div>
                                         </div>
                                         
-                                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                             {editingId === token._id ? (
                                                  <div className="flex gap-2 w-full">
                                                     <input 
-                                                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs px-1 rounded text-zinc-900 dark:text-white"
+                                                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 text-xs px-1 rounded text-zinc-900 dark:text-white"
                                                         value={editValue}
                                                         onChange={(e) => setEditValue(e.target.value)}
                                                     />
@@ -374,9 +374,9 @@ export const TokenManager: React.FC = () => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
+                                    <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200/60 dark:border-zinc-800/60">
                                         <tr>
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400 w-16">Preview</th>
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400">Name</th>
@@ -397,7 +397,7 @@ export const TokenManager: React.FC = () => {
                                                      {editingId === token._id ? (
                                                          <div className="flex gap-2">
                                                             <input 
-                                                                className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs px-1 rounded w-full text-zinc-900 dark:text-white"
+                                                                className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 text-xs px-1 rounded w-full text-zinc-900 dark:text-white"
                                                                 value={editValue}
                                                                 onChange={(e) => setEditValue(e.target.value)}
                                                             />
@@ -423,8 +423,8 @@ export const TokenManager: React.FC = () => {
 
             {/* Activity Sidebar */}
             {showActivity && (
-                <div className="w-80 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col transition-all">
-                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 font-medium text-sm flex items-center gap-2 text-zinc-900 dark:text-white">
+                <div className="w-80 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col transition-all">
+                    <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 font-medium text-sm flex items-center gap-2 text-zinc-900 dark:text-white">
                         <Activity size={16} /> Activity Log
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -446,7 +446,7 @@ export const TokenManager: React.FC = () => {
             {/* Add Token Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-md p-6 border border-zinc-200 dark:border-zinc-800">
+                    <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-md p-6 border border-zinc-200/60 dark:border-zinc-800/60">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Add {activeTab} token</h3>
                             <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
@@ -461,7 +461,7 @@ export const TokenManager: React.FC = () => {
                                     value={newToken.name}
                                     onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
                                     placeholder="e.g., primary-500"
-                                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    className="w-full px-3 py-2 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                 />
                             </div>
                             <div>
@@ -471,7 +471,7 @@ export const TokenManager: React.FC = () => {
                                     value={newToken.value}
                                     onChange={(e) => setNewToken({ ...newToken, value: e.target.value })}
                                     placeholder={activeTab === 'color' ? '#3b82f6' : '16px'}
-                                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    className="w-full px-3 py-2 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                 />
                             </div>
                             <div>
@@ -481,7 +481,7 @@ export const TokenManager: React.FC = () => {
                                     value={newToken.description}
                                     onChange={(e) => setNewToken({ ...newToken, description: e.target.value })}
                                     placeholder="Primary brand color"
-                                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    className="w-full px-3 py-2 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                 />
                             </div>
                         </div>

@@ -120,7 +120,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Settings</h2>
                 </div>
@@ -130,9 +130,9 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                 <div className="max-w-2xl mx-auto space-y-6">
                     
                     {/* Appearance / Theme */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center flex-shrink-0">
                                 {getThemeIcon()}
                             </div>
                             <div className="flex-1">
@@ -150,7 +150,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                     </div>
 
                     {/* Figma PAT */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <div className="flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] flex items-center justify-center flex-shrink-0">
                                 <Figma size={20} className="text-white" />
@@ -177,7 +177,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                             value={figmaPat}
                                             onChange={(e) => setFigmaPat(e.target.value)}
                                             placeholder={figmaPatStatus?.configured ? 'Enter new token to replace' : 'figd_xxxxxxxxxxxxx'}
-                                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 pr-10"
+                                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 pr-10"
                                         />
                                         <button
                                             onClick={() => setShowFigmaPat(!showFigmaPat)}
@@ -228,9 +228,9 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                     </div>
 
                     {/* Gemini API Key */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center flex-shrink-0">
                                 <Key size={20} className="text-zinc-700 dark:text-zinc-300" />
                             </div>
                             <div className="flex-1">
@@ -244,7 +244,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                             value={geminiKey}
                                             onChange={(e) => setGeminiKey(e.target.value)}
                                             placeholder="Enter your Gemini API key"
-                                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 pr-10"
+                                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 pr-10"
                                         />
                                         <button
                                             onClick={() => setShowGeminiKey(!showGeminiKey)}
@@ -280,10 +280,10 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                     </div>
 
                     {/* Database Status */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center">
                                     <Database size={20} className="text-zinc-700 dark:text-zinc-300" />
                                 </div>
                                 <div>
@@ -299,10 +299,10 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                     </div>
 
                     {/* Integrations */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <h3 className="font-medium text-zinc-900 dark:text-white mb-4">Integrations</h3>
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-800">
+                            <div className="flex items-center justify-between py-3 border-b border-zinc-200/60 dark:border-zinc-800/60">
                                 <div className="flex items-center gap-3">
                                     <Github size={20} className="text-zinc-700 dark:text-zinc-300" />
                                     <div>
@@ -310,12 +310,12 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                         <p className="text-xs text-zinc-500 dark:text-zinc-400">Sync components to repository</p>
                                     </div>
                                 </div>
-                                <button className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700">
+                                <button className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700">
                                     Connect
                                 </button>
                             </div>
                             
-                            <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-800">
+                            <div className="flex items-center justify-between py-3 border-b border-zinc-200/60 dark:border-zinc-800/60">
                                 <div className="flex items-center gap-3">
                                     <Figma size={20} className="text-zinc-700 dark:text-zinc-300" />
                                     <div>
@@ -348,7 +348,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                         <p className="text-xs text-zinc-500 dark:text-zinc-400">Publish packages to npm registry</p>
                                     </div>
                                 </div>
-                                <button className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700">
+                                <button className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700">
                                     Connect
                                 </button>
                             </div>

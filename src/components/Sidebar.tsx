@@ -109,8 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 </button>
                 
                 {isUserMenuOpen && (
-                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
-                    <div className="px-3 h-8 flex flex-col justify-center border-b border-zinc-200 dark:border-zinc-700">
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg shadow-lg z-50 py-1">
+                    <div className="px-3 h-8 flex flex-col justify-center border-b border-zinc-200/60 dark:border-zinc-700/60">
                       <div className="text-sm font-medium text-zinc-900 dark:text-white leading-tight">
                         {user.name || user.email.split('@')[0]}
                       </div>

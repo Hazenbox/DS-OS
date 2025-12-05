@@ -205,7 +205,7 @@ const App: React.FC = () => {
       case 'documentation':
         return (
           <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Documentation</h2>
                 </div>
@@ -220,7 +220,7 @@ const App: React.FC = () => {
       case 'feedback':
         return (
             <div className="flex flex-col h-full">
-                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                     <div>
                         <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Feedback</h2>
                     </div>
