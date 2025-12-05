@@ -876,15 +876,15 @@ export const TokenManager: React.FC = () => {
                                                         <button
                                                             onClick={() => handleFileToggle(file._id)}
                                                             title={file.isActive ? 'Disable' : 'Enable'}
-                                                            className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                                                            className={`relative w-9 h-5 rounded-full transition-colors ${
                                                                 file.isActive 
-                                                                    ? 'bg-zinc-900 dark:bg-zinc-100' 
+                                                                    ? 'bg-violet-600' 
                                                                     : 'bg-zinc-300 dark:bg-zinc-600'
                                                             }`}
                                                         >
                                                             <span 
-                                                                className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white dark:bg-zinc-900 shadow-sm transition-all ${
-                                                                    file.isActive ? 'left-[18px]' : 'left-[2px]'
+                                                                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${
+                                                                    file.isActive ? 'left-[18px]' : 'left-0.5'
                                                                 }`}
                                                             />
                                                         </button>
