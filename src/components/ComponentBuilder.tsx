@@ -113,21 +113,60 @@ const ComponentPreview: React.FC<{
   const sandpackFiles = React.useMemo(() => {
     const cssVariables = tokens.map(t => `  --${t.name}: ${t.value};`).join('\n');
     
-    // Wrap the component code in a simple App that renders it
-    const wrappedCode = `import React from 'react';
+    // Clean up the generated code:
+    // 1. Remove any existing React imports (we'll add our own)
+    // 2. Remove CSS module imports (we use inline styles)
+    // 3. Remove 'export default' statements (we'll handle export ourselves)
+    let cleanedCode = code
+      .replace(/^import\s+React.*?from\s+['"]react['"];?\s*$/gm, '')
+      .replace(/^import\s+\{[^}]*\}\s+from\s+['"]react['"];?\s*$/gm, '')
+      .replace(/^import\s+.*?\.module\.css['"];?\s*$/gm, '')
+      .replace(/^import\s+.*?\.css['"];?\s*$/gm, '')
+      .replace(/^export\s+default\s+/gm, 'export ')
+      .trim();
+    
+    // Check if the component is exported, if not wrap it
+    const hasExport = cleanedCode.includes('export const') || cleanedCode.includes('export function');
+    if (!hasExport && componentName) {
+      // Try to find the component definition and export it
+      const componentPattern = new RegExp(`(const|function)\\s+${componentName}`, 'g');
+      cleanedCode = cleanedCode.replace(componentPattern, `export $1 ${componentName}`);
+    }
+    
+    // Build the App file with proper structure
+    const wrappedCode = `import React, { forwardRef, ButtonHTMLAttributes, HTMLAttributes } from 'react';
 import './styles.css';
 
+// ============================================================
 // Generated Component
-${code}
+// ============================================================
+${cleanedCode}
 
-// Preview wrapper
+// ============================================================
+// Preview Wrapper
+// ============================================================
 export default function App() {
   return (
-    <div style={{ padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-      <span style={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+    <div style={{ 
+      padding: 40, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      gap: 20,
+      minHeight: '100vh',
+      background: '#f5f5f5'
+    }}>
+      <span style={{ 
+        fontSize: 12, 
+        color: '#666', 
+        textTransform: 'uppercase', 
+        letterSpacing: 0.5 
+      }}>
         ${componentName} Preview
       </span>
-      <${componentName}>Button</${componentName}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <${componentName}>Button</${componentName}>
+      </div>
     </div>
   );
 }
