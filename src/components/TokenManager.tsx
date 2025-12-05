@@ -3,7 +3,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, FileJson, Check, ToggleLeft, ToggleRight, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, FileJson, Check, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
 
@@ -802,47 +802,41 @@ export const TokenManager: React.FC = () => {
             {/* Files Side Panel */}
             {showFiles && (
                 <div className="w-72 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col transition-all">
-                    <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                    <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <FileJson size={16} className="text-zinc-400" />
-                                <h3 className="font-semibold text-sm text-zinc-900 dark:text-white">Source Files</h3>
-                            </div>
-                            <span className="text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-                                {tokenFiles?.length || 0}
+                            <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Source Files</h3>
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                                {tokenFiles?.length || 0} files
                             </span>
                         </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                            Toggle files to show/hide tokens
-                        </p>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-3">
+                    <div className="flex-1 overflow-y-auto p-4">
                         {(!tokenFiles || tokenFiles.length === 0) ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                                <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
-                                    <FileJson size={20} className="text-zinc-400" />
+                                <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+                                    <FileJson size={18} className="text-zinc-400" />
                                 </div>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white mb-1">No files uploaded</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white mb-1">No files</p>
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                                    Upload Figma Variables JSON
+                                    Upload JSON to import tokens
                                 </p>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 text-white rounded hover:bg-violet-700"
+                                    className="flex items-center gap-1.5 px-3 h-8 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded hover:bg-zinc-800 dark:hover:bg-zinc-200"
                                 >
-                                    <Upload size={12} /> Upload File
+                                    <Upload size={12} /> Upload
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 {tokenFiles.map((file) => (
                                     <div 
                                         key={file._id} 
                                         className={`p-3 rounded-lg border transition-all ${
                                             file.isActive 
-                                                ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30' 
-                                                : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200/60 dark:border-zinc-700/60 opacity-60'
+                                                ? 'bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700' 
+                                                : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 opacity-50'
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
@@ -878,16 +872,21 @@ export const TokenManager: React.FC = () => {
                                                     </div>
                                                     
                                                     <div className="flex items-center gap-1">
+                                                        {/* Toggle Switch */}
                                                         <button
                                                             onClick={() => handleFileToggle(file._id)}
-                                                            title={file.isActive ? 'Hide tokens' : 'Show tokens'}
-                                                            className="p-1 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50"
+                                                            title={file.isActive ? 'Disable' : 'Enable'}
+                                                            className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                                                                file.isActive 
+                                                                    ? 'bg-zinc-900 dark:bg-zinc-100' 
+                                                                    : 'bg-zinc-300 dark:bg-zinc-600'
+                                                            }`}
                                                         >
-                                                            {file.isActive ? (
-                                                                <ToggleRight size={18} className="text-violet-600 dark:text-violet-400" />
-                                                            ) : (
-                                                                <ToggleLeft size={18} className="text-zinc-400" />
-                                                            )}
+                                                            <span 
+                                                                className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white dark:bg-zinc-900 shadow-sm transition-all ${
+                                                                    file.isActive ? 'left-[18px]' : 'left-[2px]'
+                                                                }`}
+                                                            />
                                                         </button>
                                                         
                                                         <div className="relative">
