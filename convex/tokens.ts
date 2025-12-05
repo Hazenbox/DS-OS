@@ -1,6 +1,27 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
+// ============================================================================
+// HELPER: Verify project access
+// ============================================================================
+async function verifyProjectAccess(
+  ctx: any,
+  projectId: any,
+  userId: string
+): Promise<void> {
+  const project = await ctx.db.get(projectId);
+  if (!project) {
+    throw new Error("Project not found");
+  }
+  if (project.userId !== userId) {
+    throw new Error("Access denied: You don't have access to this project");
+  }
+}
+
+// ============================================================================
+// QUERIES
+// ============================================================================
+
 // Get all tokens for a project, optionally filtered by type
 export const list = query({
   args: {
@@ -28,18 +49,37 @@ export const list = query({
   },
 });
 
-// Get a single token by ID
+// Get a single token by ID (with project access verification)
 export const get = query({
-  args: { id: v.id("tokens") },
+  args: { 
+    id: v.id("tokens"),
+    userId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const token = await ctx.db.get(args.id);
+    if (!token) return null;
+    
+    // If userId provided, verify access
+    if (args.userId) {
+      const project = await ctx.db.get(token.projectId);
+      if (!project || project.userId !== args.userId) {
+        return null;
+      }
+    }
+    
+    return token;
   },
 });
+
+// ============================================================================
+// MUTATIONS
+// ============================================================================
 
 // Create a new token
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
+    userId: v.string(),
     name: v.string(),
     value: v.string(),
     type: v.union(
@@ -56,14 +96,32 @@ export const create = mutation({
     brand: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const tokenId = await ctx.db.insert("tokens", args);
+    const { userId, ...tokenData } = args;
     
-    // Log activity
+    // Verify project access
+    await verifyProjectAccess(ctx, args.projectId, userId);
+    
+    // Input validation
+    const name = tokenData.name.trim();
+    if (!name) {
+      throw new Error("Token name is required");
+    }
+    if (name.length > 100) {
+      throw new Error("Token name must be less than 100 characters");
+    }
+    
+    const tokenId = await ctx.db.insert("tokens", {
+      ...tokenData,
+      name,
+      description: tokenData.description?.trim(),
+    });
+    
+    // Log activity with actual user
     await ctx.db.insert("activity", {
       projectId: args.projectId,
-      user: "Current User",
+      user: userId,
       action: "create",
-      target: `Token: ${args.name}`,
+      target: `Token: ${name}`,
       targetType: "token",
     });
     
@@ -75,6 +133,8 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("tokens"),
+    projectId: v.id("projects"),
+    userId: v.string(),
     name: v.optional(v.string()),
     value: v.optional(v.string()),
     type: v.optional(v.union(
@@ -91,11 +151,31 @@ export const update = mutation({
     brand: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
-    const existing = await ctx.db.get(id);
+    const { id, projectId, userId, ...updates } = args;
     
+    // Verify project access
+    await verifyProjectAccess(ctx, projectId, userId);
+    
+    const existing = await ctx.db.get(id);
     if (!existing) {
       throw new Error("Token not found");
+    }
+    
+    // Verify token belongs to this project
+    if (existing.projectId.toString() !== projectId.toString()) {
+      throw new Error("Token does not belong to this project");
+    }
+    
+    // Validate name if provided
+    if (updates.name !== undefined) {
+      const name = updates.name.trim();
+      if (!name) {
+        throw new Error("Token name is required");
+      }
+      if (name.length > 100) {
+        throw new Error("Token name must be less than 100 characters");
+      }
+      updates.name = name;
     }
     
     const filteredUpdates = Object.fromEntries(
@@ -107,7 +187,7 @@ export const update = mutation({
     // Log activity
     await ctx.db.insert("activity", {
       projectId: existing.projectId,
-      user: "Current User",
+      user: userId,
       action: "update",
       target: `Token: ${existing.name}`,
       targetType: "token",
@@ -119,12 +199,23 @@ export const update = mutation({
 
 // Delete a token
 export const remove = mutation({
-  args: { id: v.id("tokens") },
+  args: { 
+    id: v.id("tokens"),
+    projectId: v.id("projects"),
+    userId: v.string(),
+  },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.id);
+    // Verify project access
+    await verifyProjectAccess(ctx, args.projectId, args.userId);
     
+    const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Token not found");
+    }
+    
+    // Verify token belongs to this project
+    if (existing.projectId.toString() !== args.projectId.toString()) {
+      throw new Error("Token does not belong to this project");
     }
     
     await ctx.db.delete(args.id);
@@ -132,7 +223,7 @@ export const remove = mutation({
     // Log activity
     await ctx.db.insert("activity", {
       projectId: existing.projectId,
-      user: "Current User",
+      user: args.userId,
       action: "delete",
       target: `Token: ${existing.name}`,
       targetType: "token",
@@ -146,6 +237,7 @@ export const remove = mutation({
 export const bulkImport = mutation({
   args: {
     projectId: v.id("projects"),
+    userId: v.string(),
     tokens: v.array(v.object({
       name: v.string(),
       value: v.string(),
@@ -165,6 +257,14 @@ export const bulkImport = mutation({
     clearExisting: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    // Verify project access
+    await verifyProjectAccess(ctx, args.projectId, args.userId);
+    
+    // Limit bulk import size
+    if (args.tokens.length > 1000) {
+      throw new Error("Cannot import more than 1000 tokens at once");
+    }
+    
     // Optionally clear existing tokens for this project
     if (args.clearExisting) {
       const existingTokens = await ctx.db
@@ -181,6 +281,7 @@ export const bulkImport = mutation({
     for (const token of args.tokens) {
       const id = await ctx.db.insert("tokens", {
         ...token,
+        name: token.name.trim(),
         projectId: args.projectId,
       });
       insertedIds.push(id);
@@ -189,7 +290,7 @@ export const bulkImport = mutation({
     // Log activity
     await ctx.db.insert("activity", {
       projectId: args.projectId,
-      user: "Current User",
+      user: args.userId,
       action: "import",
       target: `Imported ${args.tokens.length} tokens`,
       targetType: "token",

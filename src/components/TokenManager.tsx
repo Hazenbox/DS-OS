@@ -18,7 +18,7 @@ const TABS: { id: TokenType; label: string }[] = [
 ];
 
 export const TokenManager: React.FC = () => {
-    const { projectId } = useProject();
+    const { projectId, userId } = useProject();
     const [activeTab, setActiveTab] = useState<TokenType>('color');
     const [showActivity, setShowActivity] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -52,8 +52,9 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleSave = async (id: Id<"tokens">) => {
+        if (!projectId || !userId) return;
         try {
-            await updateToken({ id, value: editValue });
+            await updateToken({ id, projectId, userId, value: editValue });
             setEditingId(null);
         } catch (error) {
             console.error('Failed to update token:', error);
@@ -61,19 +62,21 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleDelete = async (id: Id<"tokens">) => {
+        if (!projectId || !userId) return;
         try {
-            await removeToken({ id });
+            await removeToken({ id, projectId, userId });
         } catch (error) {
             console.error('Failed to delete token:', error);
         }
     };
 
     const handleAddToken = async () => {
-        if (!newToken.name || !newToken.value || !projectId) return;
+        if (!newToken.name || !newToken.value || !projectId || !userId) return;
         
         try {
             await createToken({
                 projectId,
+                userId,
                 name: newToken.name,
                 value: newToken.value,
                 type: activeTab,
@@ -96,8 +99,10 @@ export const TokenManager: React.FC = () => {
                 const json = JSON.parse(event.target?.result as string);
                 const parsedTokens = flattenTokens(json);
                 
+                if (!userId) return;
                 await bulkImport({ 
                     projectId,
+                    userId,
                     tokens: parsedTokens,
                     clearExisting: false 
                 });
@@ -166,9 +171,10 @@ export const TokenManager: React.FC = () => {
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
         
+        if (!userId) return;
         await logActivity({
             projectId,
-            user: 'Current User',
+            user: userId,
             action: 'download',
             target: 'Tokens exported',
             targetType: 'token',

@@ -1,5 +1,20 @@
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+
+// Simple password hashing (for demo - use bcrypt/argon2 in production)
+// In production, use a proper hashing library via Convex actions
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + "ds-os-salt-v1");
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const passwordHash = await hashPassword(password);
+  return passwordHash === hash;
+}
 
 // Sign up with email and password
 export const signup = mutation({
@@ -9,30 +24,43 @@ export const signup = mutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Input validation
+    const email = args.email.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      throw new Error("Invalid email address");
+    }
+    if (!args.password || args.password.length < 8) {
+      throw new Error("Password must be at least 8 characters");
+    }
+
     // Check if user already exists
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (existingUser) {
       throw new Error("User with this email already exists");
     }
+
+    // Hash password
+    const passwordHash = await hashPassword(args.password);
     
-    // Create user with email auto-verified
+    // Create user
     const userId = await ctx.db.insert("users", {
-      email: args.email,
-      emailVerified: true,
-      name: args.name || args.email.split("@")[0],
+      email,
+      emailVerified: true, // Auto-verify for now
+      name: args.name || email.split("@")[0],
       role: "user",
       provider: "email",
+      providerId: passwordHash, // Store hash in providerId for email users
       createdAt: Date.now(),
     });
 
     return {
       userId,
-      email: args.email,
-      name: args.name || args.email.split("@")[0],
+      email,
+      name: args.name || email.split("@")[0],
       role: "user",
       message: "User created successfully.",
     };
@@ -46,12 +74,31 @@ export const login = mutation({
     password: v.string(),
   },
   handler: async (ctx, args) => {
+    const email = args.email.trim().toLowerCase();
+    
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (!user) {
+      // Use generic error to prevent user enumeration
+      throw new Error("Invalid email or password");
+    }
+
+    // Check if this is an email/password user
+    if (user.provider !== 'email') {
+      throw new Error(`Please sign in with ${user.provider}`);
+    }
+
+    // Verify password
+    const passwordHash = user.providerId;
+    if (!passwordHash) {
+      throw new Error("Invalid email or password");
+    }
+
+    const isValid = await verifyPassword(args.password, passwordHash);
+    if (!isValid) {
       throw new Error("Invalid email or password");
     }
 
@@ -80,6 +127,8 @@ export const oauthLogin = mutation({
     image: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const email = args.email.trim().toLowerCase();
+    
     // Check if user exists by provider ID
     const existingByProvider = await ctx.db
       .query("users")
@@ -109,17 +158,25 @@ export const oauthLogin = mutation({
     // Check if user exists by email (link accounts)
     const existingByEmail = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (existingByEmail) {
-      // Link the OAuth provider to existing account
-      await ctx.db.patch(existingByEmail._id, {
-        provider: args.provider,
-        providerId: args.providerId,
-        image: args.image || existingByEmail.image,
-        lastLoginAt: Date.now(),
-      });
+      // Only link if existing account is email provider
+      // Don't overwrite another OAuth provider
+      if (existingByEmail.provider === 'email') {
+        await ctx.db.patch(existingByEmail._id, {
+          provider: args.provider,
+          providerId: args.providerId,
+          image: args.image || existingByEmail.image,
+          lastLoginAt: Date.now(),
+        });
+      } else {
+        // Account exists with different OAuth - just update login time
+        await ctx.db.patch(existingByEmail._id, {
+          lastLoginAt: Date.now(),
+        });
+      }
 
       return {
         userId: existingByEmail._id,
@@ -133,9 +190,9 @@ export const oauthLogin = mutation({
 
     // Create new user
     const userId = await ctx.db.insert("users", {
-      email: args.email,
+      email,
       emailVerified: true, // OAuth emails are verified
-      name: args.name || args.email.split("@")[0],
+      name: args.name || email.split("@")[0],
       image: args.image,
       role: "user",
       provider: args.provider,
@@ -146,8 +203,8 @@ export const oauthLogin = mutation({
 
     return {
       userId,
-      email: args.email,
-      name: args.name || args.email.split("@")[0],
+      email,
+      name: args.name || email.split("@")[0],
       image: args.image,
       role: "user",
       isNewUser: true,
@@ -219,9 +276,11 @@ export const resendVerification = mutation({
     email: v.string(),
   },
   handler: async (ctx, args) => {
+    const email = args.email.trim().toLowerCase();
+    
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (!user) {
@@ -254,10 +313,9 @@ export const resendVerification = mutation({
     });
 
     // In production, send email with verification link
-    console.log(`New verification token for ${args.email}: ${verificationToken}`);
+    console.log(`New verification token for ${email}: ${verificationToken}`);
     
     return {
-      verificationToken, // Remove this in production
       message: "Verification email sent",
     };
   },
