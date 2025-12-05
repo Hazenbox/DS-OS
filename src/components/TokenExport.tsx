@@ -214,28 +214,28 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-zinc-200 dark:border-zinc-800">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-border">
+                <div className="flex justify-between items-center p-4 border-b border-zinc-200 dark:border-zinc-800">
                     <div>
-                        <h3 className="text-lg font-semibold text-primary">Export Tokens</h3>
-                        <p className="text-xs text-muted">{tokens.length} tokens ready to export</p>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Export Tokens</h3>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{tokens.length} tokens ready to export</p>
                     </div>
-                    <button onClick={onClose} className="text-muted hover:text-primary p-1">
+                    <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1">
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Format Tabs */}
-                <div className="flex gap-1 p-3 border-b border-border bg-surface/30">
+                <div className="flex gap-1 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
                     {formats.map(f => (
                         <button
                             key={f.id}
                             onClick={() => setActiveFormat(f.id)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                                 activeFormat === f.id 
-                                    ? 'bg-accent text-white' 
-                                    : 'text-muted hover:text-primary hover:bg-surface'
+                                    ? 'bg-violet-600 text-white' 
+                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700'
                             }`}
                         >
                             {f.icon}
@@ -246,36 +246,36 @@ export const TokenExport: React.FC<TokenExportProps> = ({ tokens, isOpen, onClos
 
                 {/* Options */}
                 {(activeFormat === 'css' || activeFormat === 'scss') && (
-                    <div className="px-4 py-2 border-b border-border bg-surface/20 flex items-center gap-3">
-                        <label className="text-xs text-muted">Variable prefix:</label>
+                    <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center gap-3">
+                        <label className="text-xs text-zinc-500 dark:text-zinc-400">Variable prefix:</label>
                         <input
                             type="text"
                             value={prefix}
                             onChange={(e) => setPrefix(e.target.value)}
-                            className="px-2 py-1 text-xs border border-border rounded bg-background text-primary w-24"
+                            className="px-2 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white w-24"
                         />
                     </div>
                 )}
 
                 {/* Output */}
                 <div className="flex-1 overflow-hidden p-4">
-                    <pre className="h-full overflow-auto bg-[#1e1e1e] rounded-lg p-4 text-sm text-zinc-300 font-mono">
+                    <pre className="h-full overflow-auto bg-zinc-900 rounded-lg p-4 text-sm text-zinc-300 font-mono">
                         {getOutput()}
                     </pre>
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 p-4 border-t border-border">
+                <div className="flex justify-end gap-2 p-4 border-t border-zinc-200 dark:border-zinc-800">
                     <button
                         onClick={handleCopy}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary bg-surface border border-border rounded-lg hover:bg-surface/80"
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700"
                     >
                         {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
                         {copied ? 'Copied!' : 'Copy'}
                     </button>
                     <button
                         onClick={handleDownload}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent/90"
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700"
                     >
                         <Download size={16} />
                         Download

@@ -210,11 +210,11 @@ export default NewComponent;`,
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: List & Controls */}
-            <div className="w-72 border-r border-border flex flex-col bg-surface/30">
-                <div className="p-4 border-b border-border flex justify-between items-center bg-background">
+            <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900">
                     <div>
-                        <h2 className="text-lg font-semibold text-primary">Builder</h2>
-                        <p className="text-xs text-muted">AI-powered generation</p>
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">AI-powered generation</p>
                     </div>
                     <div className="flex gap-2">
                         <button 
@@ -225,7 +225,7 @@ export default NewComponent;`,
                         </button>
                         <button 
                             onClick={handleCreateNew} 
-                            className="text-xs bg-bg-inverse text-inverse px-2.5 py-1.5 rounded font-medium hover:opacity-90"
+                            className="text-xs bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-2.5 py-1.5 rounded font-medium hover:opacity-90"
                         >
                             + New
                         </button>
@@ -236,16 +236,16 @@ export default NewComponent;`,
                         <div 
                             key={c._id} 
                             onClick={() => handleSelectComponent(c._id)}
-                            className={`p-3 border-b border-border cursor-pointer hover:bg-surface/50 group ${selectedComponentId === c._id ? 'bg-surface border-l-2 border-l-accent' : ''}`}
+                            className={`p-3 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 group ${selectedComponentId === c._id ? 'bg-zinc-100 dark:bg-zinc-800 border-l-2 border-l-violet-500' : ''}`}
                         >
                             <div className="flex justify-between items-start">
-                                <div className="font-medium text-sm text-primary">{c.name}</div>
+                                <div className="font-medium text-sm text-zinc-900 dark:text-white">{c.name}</div>
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleDelete(c._id);
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 p-1"
+                                    className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 p-1"
                                 >
                                     <Trash2 size={12} />
                                 </button>
@@ -259,9 +259,9 @@ export default NewComponent;`,
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                     className={`text-[10px] uppercase px-1.5 py-0.5 rounded bg-transparent border-none cursor-pointer ${
-                                        c.status === 'stable' ? 'text-green-600' : 
-                                        c.status === 'review' ? 'text-yellow-600' : 
-                                        c.status === 'deprecated' ? 'text-red-600' : 'text-zinc-500'
+                                        c.status === 'stable' ? 'text-green-600 dark:text-green-400' : 
+                                        c.status === 'review' ? 'text-yellow-600 dark:text-yellow-400' : 
+                                        c.status === 'deprecated' ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400'
                                     }`}
                                 >
                                     <option value="draft">Draft</option>
@@ -269,7 +269,7 @@ export default NewComponent;`,
                                     <option value="stable">Stable</option>
                                     <option value="deprecated">Deprecated</option>
                                 </select>
-                                <span className="text-[10px] text-muted font-mono">v{c.version}</span>
+                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">v{c.version}</span>
                             </div>
                         </div>
                     ))}
@@ -278,19 +278,19 @@ export default NewComponent;`,
 
             {/* Main Content Area */}
             {selectedComponent ? (
-                <div className="flex-1 flex flex-col bg-background overflow-hidden">
+                <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
                     {/* Header Tabs */}
-                    <div className="h-12 border-b border-border flex items-center px-3 justify-between bg-surface/30">
+                    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-3 justify-between bg-zinc-50 dark:bg-zinc-900/50">
                         <div className="flex gap-1 h-full items-center">
                             <button 
                                 onClick={() => setActiveTab('code')}
-                                className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${activeTab === 'code' ? 'bg-background text-primary shadow-sm' : 'text-muted hover:text-primary'}`}
+                                className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${activeTab === 'code' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                             >
                                 <Code size={14} /> Code
                             </button>
                             <button 
                                 onClick={() => setActiveTab('docs')}
-                                className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${activeTab === 'docs' ? 'bg-background text-primary shadow-sm' : 'text-muted hover:text-primary'}`}
+                                className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${activeTab === 'docs' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                             >
                                 <FileText size={14} /> Docs
                             </button>
@@ -299,26 +299,26 @@ export default NewComponent;`,
                             {hasUnsavedChanges && (
                                 <button
                                     onClick={handleSaveCode}
-                                    className="text-xs px-2.5 py-1 bg-accent text-white rounded font-medium hover:bg-accent/90"
+                                    className="text-xs px-2.5 py-1 bg-violet-600 text-white rounded font-medium hover:bg-violet-700"
                                 >
                                     Save Changes
                                 </button>
                             )}
                             <button
                                 onClick={handleCopyCode}
-                                className="p-1.5 text-muted hover:text-primary rounded hover:bg-surface"
+                                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
                                 title="Copy code"
                             >
                                 {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                             </button>
                             <button
                                 onClick={() => setShowPreview(!showPreview)}
-                                className={`p-1.5 rounded transition-colors ${showPreview ? 'bg-accent text-white' : 'text-muted hover:text-primary hover:bg-surface'}`}
+                                className={`p-1.5 rounded transition-colors ${showPreview ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                                 title={showPreview ? 'Hide preview' : 'Show preview'}
                             >
                                 {showPreview ? <Eye size={14} /> : <EyeOff size={14} />}
                             </button>
-                            <div className="flex items-center gap-1.5 text-xs text-muted">
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                                 <div className={`w-1.5 h-1.5 rounded-full ${hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
                                 {hasUnsavedChanges ? 'Unsaved' : 'Synced'}
                             </div>
@@ -328,7 +328,7 @@ export default NewComponent;`,
                     {/* Main Content */}
                     <div className="flex-1 overflow-hidden flex">
                         {/* Code/Docs Panel */}
-                        <div className={`flex flex-col ${showPreview ? 'w-1/2 border-r border-border' : 'w-full'}`}>
+                        <div className={`flex flex-col ${showPreview ? 'w-1/2 border-r border-zinc-200 dark:border-zinc-800' : 'w-full'}`}>
                             {activeTab === 'code' && (
                                 <div className="flex-1 overflow-hidden">
                                     <Editor
@@ -353,9 +353,9 @@ export default NewComponent;`,
                                 </div>
                             )}
                             {activeTab === 'docs' && (
-                                <div className="flex-1 overflow-y-auto p-6">
+                                <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-zinc-900">
                                     <div className="prose prose-sm max-w-none dark:prose-invert">
-                                        <pre className="whitespace-pre-wrap font-sans text-primary text-sm leading-relaxed">
+                                        <pre className="whitespace-pre-wrap font-sans text-zinc-900 dark:text-white text-sm leading-relaxed">
                                             {selectedComponent.docs}
                                         </pre>
                                     </div>
@@ -363,10 +363,10 @@ export default NewComponent;`,
                             )}
 
                             {/* Prompt Input */}
-                            <div className="p-3 border-t border-border bg-surface/50">
+                            <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
                                 <div className="flex gap-2 items-end">
                                     <textarea
-                                        className="flex-1 bg-background border border-border rounded-lg text-sm text-primary py-2.5 px-3 resize-none placeholder:text-muted focus:outline-none focus:border-accent min-h-[44px] max-h-24"
+                                        className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white py-2.5 px-3 resize-none placeholder:text-zinc-400 focus:outline-none focus:border-violet-500 min-h-[44px] max-h-24"
                                         placeholder="Describe changes (e.g., 'Add hover effect with scale animation')..."
                                         value={prompt}
                                         onChange={(e) => setPrompt(e.target.value)}
@@ -381,7 +381,7 @@ export default NewComponent;`,
                                     <button 
                                         onClick={handleGenerate}
                                         disabled={isGenerating || !prompt.trim()}
-                                        className="h-[44px] w-[44px] flex items-center justify-center bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="h-[44px] w-[44px] flex items-center justify-center bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                                     </button>
@@ -404,8 +404,8 @@ export default NewComponent;`,
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 flex items-center justify-center text-muted flex-col gap-4 bg-surface/30">
-                    <div className="w-16 h-16 rounded-full bg-surface border border-border flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center text-zinc-500 dark:text-zinc-400 flex-col gap-4 bg-zinc-50 dark:bg-zinc-900/50">
+                    <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
                         <Zap size={24} />
                     </div>
                     <p className="text-sm">Select a component or create new to start building</p>
@@ -419,7 +419,7 @@ export default NewComponent;`,
                         </button>
                         <button
                             onClick={handleCreateNew}
-                            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90"
+                            className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700"
                         >
                             Create Blank
                         </button>

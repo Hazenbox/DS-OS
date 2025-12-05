@@ -124,18 +124,18 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
-                    <h2 className="text-xl font-semibold text-primary">Release</h2>
+                    <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Release</h2>
                 </div>
                 <div className="flex gap-2 items-center">
-                    <span className="text-xs text-muted font-mono">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                         Next: {nextVersion()}
                     </span>
                     <button 
                         onClick={startRelease}
                         disabled={!!activeDeploy && activeDeploy.some(s => s.status === 'running')}
-                        className="h-8 px-3 rounded-lg bg-bg-inverse text-inverse text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-sm"
+                        className="h-8 px-3 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-sm"
                     >
                         {activeDeploy && activeDeploy.some(s => s.status === 'running') ? (
                             <Loader2 size={16} className="animate-spin" />
@@ -147,29 +147,29 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 bg-zinc-50 dark:bg-zinc-950">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
-                        <h3 className="text-sm font-semibold text-primary mb-4">Pipeline Status</h3>
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
+                        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">Pipeline Status</h3>
                         
                         {activeDeploy ? (
                              <div className="space-y-6 relative">
-                                <div className="absolute left-[21px] top-2 bottom-2 w-0.5 bg-border -z-10" />
+                                <div className="absolute left-[21px] top-2 bottom-2 w-0.5 bg-zinc-200 dark:bg-zinc-700 -z-10" />
                                 {activeDeploy.map((step, idx) => (
                                     <div key={step.step} className="flex items-center gap-4">
-                                        <div className="bg-background border border-border rounded-full p-1">{getStatusIcon(step.status)}</div>
+                                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full p-1">{getStatusIcon(step.status)}</div>
                                         <div className="flex-1">
-                                            <div className="text-sm font-medium capitalize text-primary">{step.step}</div>
-                                            <div className="text-xs text-muted">
+                                            <div className="text-sm font-medium capitalize text-zinc-900 dark:text-white">{step.step}</div>
+                                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
                                                 {step.status === 'running' ? 'Processing...' : step.status === 'pending' ? 'Waiting...' : 'Completed'}
                                             </div>
                                         </div>
-                                        {step.status === 'success' && <div className="text-xs font-mono text-muted">2.4s</div>}
+                                        {step.status === 'success' && <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400">2.4s</div>}
                                     </div>
                                 ))}
                              </div>
                         ) : (
-                            <div className="text-center py-12 text-muted text-sm border-2 border-dashed border-border rounded">
+                            <div className="text-center py-12 text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded">
                                 No active releases. Click 'Trigger Release' to start.
                             </div>
                         )}
@@ -177,17 +177,17 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
 
                     {/* Release History */}
                     {releases && releases.length > 0 && (
-                        <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg overflow-hidden">
-                            <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/[0.03]">
-                                <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                                     <Package size={14} /> Release History
                                 </h3>
                             </div>
-                            <div className="divide-y divide-border">
+                            <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
                                 {releases.slice(0, 5).map(release => (
                                     <div key={release._id} className="px-6 py-4 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <span className="font-mono font-medium text-primary">{release.version}</span>
+                                            <span className="font-mono font-medium text-zinc-900 dark:text-white">{release.version}</span>
                                             <span className={`text-xs px-2 py-0.5 rounded ${
                                                 release.status === 'published' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
                                                 release.status === 'in_progress' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
@@ -197,7 +197,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                                                 {release.status}
                                             </span>
                                         </div>
-                                        <span className="text-xs text-muted">
+                                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
                                             {release.publishedAt 
                                                 ? new Date(release.publishedAt).toLocaleDateString()
                                                 : 'Pending'
@@ -209,17 +209,17 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                         </div>
                     )}
 
-                    <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-border bg-black/5 dark:bg-white/[0.03]">
-                            <h3 className="text-sm font-semibold text-primary">Changelog Preview</h3>
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+                        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Changelog Preview</h3>
                         </div>
-                        <div className="p-6 font-mono text-sm text-muted space-y-2">
-                            <p className="text-primary font-bold">## {nextVersion()} (Upcoming)</p>
+                        <div className="p-6 font-mono text-sm text-zinc-500 dark:text-zinc-400 space-y-2">
+                            <p className="text-zinc-900 dark:text-white font-bold">## {nextVersion()} (Upcoming)</p>
                             <p>### Features</p>
                             <ul className="list-disc pl-4 space-y-1">
                                 {pendingComponents.map(c => (
                                     <li key={c.id}>
-                                        <span className="text-accent">{c.name}</span>: {c.status} → stable
+                                        <span className="text-violet-600 dark:text-violet-400">{c.name}</span>: {c.status} → stable
                                     </li>
                                 ))}
                                 {pendingComponents.length === 0 && <li>No pending changes</li>}

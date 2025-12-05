@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   ];
 
   return (
-    <div className="w-64 h-full flex flex-col bg-[#fafafa] dark:bg-[#18181b] flex-shrink-0 transition-colors duration-200">
+    <div className="w-64 h-full flex flex-col bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 transition-colors duration-200">
       <div className="px-4 pt-6 pb-2">
         <div className="flex items-center gap-3 mb-6 px-2">
             <div className="w-8 h-8 bg-bg-inverse text-inverse rounded-lg flex items-center justify-center">
@@ -89,18 +89,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
             </button>
             
             {isProjectMenuOpen && (
-                <div className="absolute top-full left-0 w-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 py-1">
+                <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
                     <div className="px-3 h-8 flex items-center text-xs font-semibold text-muted uppercase tracking-wider">Projects</div>
-                    <button className="w-full h-8 text-left px-3 text-sm text-primary hover:bg-surface flex items-center gap-2 transition-all duration-200 ease-in-out">
+                    <button className="w-full h-8 text-left px-3 text-sm text-primary hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
                         <div className="w-2 h-2 rounded-full bg-green-500"></div>
                         Orbit DS (Active)
                     </button>
-                    <button className="w-full h-8 text-left px-3 text-sm text-muted hover:text-primary hover:bg-surface flex items-center gap-2 transition-all duration-200 ease-in-out">
-                        <div className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                    <button className="w-full h-8 text-left px-3 text-sm text-muted hover:text-primary hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
+                        <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600"></div>
                         Marketing Site
                     </button>
-                    <div className="h-px bg-border my-1"></div>
-                    <button className="w-full h-8 text-left px-3 text-sm text-accent hover:bg-surface flex items-center gap-2 transition-all duration-200 ease-in-out">
+                    <div className="h-px bg-zinc-200 dark:bg-zinc-700 my-1"></div>
+                    <button className="w-full h-8 text-left px-3 text-sm text-accent hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out">
                         <Plus size={14} /> Create Project
                     </button>
                 </div>
@@ -156,12 +156,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 </button>
                 
                 {isUserMenuOpen && (
-                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-background border border-border rounded-lg shadow-lg z-50 py-1">
-                    <div className="px-3 h-8 flex flex-col justify-center border-b border-border">
-                      <div className="text-sm font-medium text-primary leading-tight">
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
+                    <div className="px-3 h-8 flex flex-col justify-center border-b border-zinc-200 dark:border-zinc-700">
+                      <div className="text-sm font-medium text-zinc-900 dark:text-white leading-tight">
                         {user.name || 'Upen'}
                       </div>
-                      <div className="text-xs text-muted truncate leading-tight">
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate leading-tight">
                         {user.email}
                       </div>
                     </div>
@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                         setIsUserMenuOpen(false);
                         onLogout();
                       }}
-                      className="w-full h-8 text-left px-3 text-sm text-muted hover:text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/10 flex items-center gap-2 transition-all duration-200 ease-in-out"
+                      className="w-full h-8 text-left px-3 text-sm text-zinc-600 dark:text-zinc-400 hover:text-red-500 hover:bg-red-500/10 flex items-center gap-2 transition-all duration-200 ease-in-out"
                     >
                       <LogOut size={14} />
                       <span>Sign Out</span>

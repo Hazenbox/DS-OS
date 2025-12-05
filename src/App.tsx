@@ -180,20 +180,20 @@ const App: React.FC = () => {
     if (backendAvailable === false) {
       // Backend is confirmed unavailable, show warning but continue
       return (
-        <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+        <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <p className="text-sm text-zinc-500">Backend unavailable - using offline mode</p>
+            <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Backend unavailable - using offline mode</p>
           </div>
         </div>
       );
     }
     // Still loading, show loading state
     return (
-      <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+      <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <p className="text-sm text-zinc-500">Connecting to database...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Connecting to database...</p>
         </div>
       </div>
     );
@@ -202,23 +202,23 @@ const App: React.FC = () => {
   // Empty state - offer to seed
   if (needsSeeding) {
     return (
-      <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] items-center justify-center">
+      <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
         <div className="flex flex-col items-center gap-6 max-w-md text-center p-8">
-          <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
-            <Database className="w-8 h-8 text-blue-500" />
+          <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center">
+            <Database className="w-8 h-8 text-violet-500" />
           </div>
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
               Welcome to DS-OS
             </h1>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               Your database is empty. Would you like to seed it with initial design tokens and components?
             </p>
           </div>
           <button
             onClick={handleSeedData}
             disabled={isSeeding}
-            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2.5 bg-violet-600 text-white rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSeeding ? (
               <>
@@ -249,29 +249,29 @@ const App: React.FC = () => {
       case 'documentation':
         return (
           <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
-                    <h2 className="text-xl font-semibold text-primary">Documentation</h2>
+                    <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Documentation</h2>
                 </div>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-muted space-y-4">
-              <BookOpen size={48} className="text-muted" strokeWidth={1} />
-              <h2 className="text-lg font-medium text-primary">Docusaurus Integration</h2>
-              <p className="max-w-md text-center text-sm">Documentation is auto-generated and hosted on Docusaurus. <br/> <a href="#" className="text-accent hover:underline">View Live Site</a></p>
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4 bg-zinc-50 dark:bg-zinc-950">
+              <BookOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Docusaurus Integration</h2>
+              <p className="max-w-md text-center text-sm">Documentation is auto-generated and hosted on Docusaurus. <br/> <a href="#" className="text-violet-600 dark:text-violet-400 hover:underline">View Live Site</a></p>
             </div>
           </div>
         );
       case 'feedback':
         return (
             <div className="flex flex-col h-full">
-                <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                     <div>
-                        <h2 className="text-xl font-semibold text-primary">Feedback</h2>
+                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Feedback</h2>
                     </div>
                 </div>
-                <div className="flex-1 flex flex-col items-center justify-center text-muted space-y-4">
-                  <MessageSquare size={48} className="text-muted" strokeWidth={1} />
-                  <h2 className="text-lg font-medium text-primary">No New Feedback</h2>
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4 bg-zinc-50 dark:bg-zinc-950">
+                  <MessageSquare size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+                  <h2 className="text-lg font-medium text-zinc-900 dark:text-white">No New Feedback</h2>
                   <p className="text-sm">No new tickets from Storybook or Docs integration.</p>
                 </div>
             </div>
@@ -282,7 +282,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#000000] font-sans text-primary selection:bg-accent/30 transition-colors duration-200">
+    <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
       <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user} onLogout={handleLogout} />
       
       <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
@@ -291,7 +291,7 @@ const App: React.FC = () => {
             ⚠️ Backend unavailable - Running in offline mode. Data changes will not be persisted.
           </div>
         )}
-        <main className="flex-1 h-full w-full rounded-[12px] bg-background overflow-hidden relative border border-border/30">
+        <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
           {renderView()}
         </main>
       </div>
