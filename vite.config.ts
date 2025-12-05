@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
       server: {
-        port: 3000,
+        port: 1899,
         host: '0.0.0.0',
         // Enable history API fallback for SPA routing
         historyApiFallback: true,

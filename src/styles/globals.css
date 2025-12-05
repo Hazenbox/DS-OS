@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Configure dark mode to use .dark class (Tailwind v4) */
+@variant dark (&:where(.dark, .dark *));
+
 /* Light theme (default) */
 :root {
   --color-primary: #09090b;
