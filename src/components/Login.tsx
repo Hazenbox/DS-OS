@@ -46,12 +46,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
   return (
     <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#0a0a0a]">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-between bg-[#f0f0f0] dark:bg-[#0f0f0f]">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-center bg-[#f0f0f0] dark:bg-[#0f0f0f]">
         {/* Gradient glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-30 dark:opacity-40 bg-gradient-to-b from-violet-500 to-transparent" />
         
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-2">
+        <div className="absolute top-8 left-8 z-10 flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-violet-500/20 dark:bg-violet-500/30 flex items-center justify-center">
             <Layers size={18} className="text-violet-600 dark:text-violet-400" />
           </div>
@@ -59,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
         </div>
 
         {/* Main Content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md">
+        <div className="relative z-10 max-w-md mx-auto">
           <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 leading-tight">
             Design Systems,<br />
             <span className="text-violet-600 dark:text-violet-400">Orchestrated.</span>
@@ -87,37 +87,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Steps */}
-        <div className="relative z-10 flex gap-3">
-          {[
-            { num: 1, label: 'Sign in', active: true },
-            { num: 2, label: 'Access workspace', active: false },
-            { num: 3, label: 'Build & ship', active: false },
-          ].map((step) => (
-            <div 
-              key={step.num}
-              className={`flex-1 p-2.5 rounded-lg border text-center transition-all
-                ${step.active 
-                  ? 'bg-violet-500/10 dark:bg-violet-500/10 border-violet-500/30' 
-                  : 'bg-transparent border-zinc-200 dark:border-white/10'
-                }`}
-            >
-              <div 
-                className={`w-5 h-5 rounded-full mx-auto mb-1.5 flex items-center justify-center text-[10px] font-semibold
-                  ${step.active 
-                    ? 'bg-violet-500 text-white' 
-                    : 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-zinc-600'
-                  }`}
-              >
-                {step.num}
-              </div>
-              <p className={`text-[10px] ${step.active ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-600'}`}>
-                {step.label}
-              </p>
-            </div>
-          ))}
         </div>
       </div>
 

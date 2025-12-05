@@ -61,23 +61,23 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
   return (
     <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#0a0a0a]">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-between bg-[#f0f0f0] dark:bg-[#0f0f0f]">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-center bg-[#f0f0f0] dark:bg-[#0f0f0f]">
         {/* Gradient glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-30 dark:opacity-40 bg-gradient-to-b from-emerald-500 to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-30 dark:opacity-40 bg-gradient-to-b from-violet-500 to-transparent" />
         
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 dark:bg-emerald-500/30 flex items-center justify-center">
-            <Layers size={18} className="text-emerald-600 dark:text-emerald-400" />
+        <div className="absolute top-8 left-8 z-10 flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-violet-500/20 dark:bg-violet-500/30 flex items-center justify-center">
+            <Layers size={18} className="text-violet-600 dark:text-violet-400" />
           </div>
           <span className="text-lg font-semibold text-zinc-900 dark:text-white">DS-OS</span>
         </div>
 
         {/* Main Content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-md">
+        <div className="relative z-10 max-w-md mx-auto">
           <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 leading-tight">
             Build Better<br />
-            <span className="text-emerald-600 dark:text-emerald-400">Design Systems</span>
+            <span className="text-violet-600 dark:text-violet-400">Design Systems</span>
           </h1>
           <p className="text-zinc-600 dark:text-[#888] text-sm leading-relaxed mb-8">
             Join teams using DS-OS to transform Figma designs into production-ready 
@@ -92,8 +92,8 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
               { icon: Package, label: 'NPM Publishing', desc: 'Ship packages instantly' },
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white/50 dark:bg-white/5 border border-zinc-200 dark:border-white/10">
-                <div className="w-8 h-8 rounded-md bg-emerald-500/10 flex items-center justify-center">
-                  <feature.icon size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <div className="w-8 h-8 rounded-md bg-violet-500/10 flex items-center justify-center">
+                  <feature.icon size={16} className="text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-zinc-900 dark:text-white">{feature.label}</p>
@@ -103,37 +103,6 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
             ))}
           </div>
         </div>
-
-        {/* Steps */}
-        <div className="relative z-10 flex gap-3">
-          {[
-            { num: 1, label: 'Create account', active: true },
-            { num: 2, label: 'Setup workspace', active: false },
-            { num: 3, label: 'Import tokens', active: false },
-          ].map((step) => (
-            <div 
-              key={step.num}
-              className={`flex-1 p-2.5 rounded-lg border text-center transition-all
-                ${step.active 
-                  ? 'bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/30' 
-                  : 'bg-transparent border-zinc-200 dark:border-white/10'
-                }`}
-            >
-              <div 
-                className={`w-5 h-5 rounded-full mx-auto mb-1.5 flex items-center justify-center text-[10px] font-semibold
-                  ${step.active 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-zinc-600'
-                  }`}
-              >
-                {step.num}
-              </div>
-              <p className={`text-[10px] ${step.active ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-600'}`}>
-                {step.label}
-              </p>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Right Panel - Form */}
@@ -141,8 +110,8 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
         <div className="w-full max-w-sm">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <Layers size={22} className="text-emerald-600 dark:text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center">
+              <Layers size={22} className="text-violet-600 dark:text-violet-400" />
             </div>
             <span className="text-xl font-semibold text-zinc-900 dark:text-white">DS-OS</span>
           </div>
@@ -192,7 +161,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
                   placeholder="John"
                 />
               </div>
@@ -202,7 +171,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
                   placeholder="Doe"
                 />
               </div>
@@ -215,7 +184,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
                 placeholder="you@company.com"
               />
             </div>
@@ -229,7 +198,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full h-8 px-3 pr-9 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all"
+                  className="w-full h-8 px-3 pr-9 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
                   placeholder="Minimum 8 characters"
                 />
                 <button
@@ -246,7 +215,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-8 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
+              className="w-full h-8 rounded-md text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md"
             >
               {isLoading ? (
                 <>
@@ -261,7 +230,7 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
 
           <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-500">
             Already have an account?{' '}
-            <button onClick={onSwitchToLogin} className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
+            <button onClick={onSwitchToLogin} className="text-violet-600 dark:text-violet-400 hover:underline font-medium">
               Sign in
             </button>
           </p>
