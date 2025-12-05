@@ -124,7 +124,7 @@ const ActivityItem: React.FC<{
         </div>
       </div>
     </div>
-  );
+);
 };
 
 export const Dashboard: React.FC = () => {

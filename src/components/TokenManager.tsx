@@ -3,7 +3,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, FileJson, Check, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, X, FileJson, Check, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
 
@@ -354,7 +354,6 @@ export const TokenManager: React.FC = () => {
     const { projectId, userId } = useProject();
     const [activeTab, setActiveTab] = useState<TokenType | 'all'>('all');
     const [showFiles, setShowFiles] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -539,7 +538,7 @@ export const TokenManager: React.FC = () => {
             await removeFile({ id: fileId, projectId });
         } catch (error) {
             console.error('Failed to delete file:', error);
-        }
+            }
     };
 
     // Render token preview based on type
@@ -557,11 +556,11 @@ export const TokenManager: React.FC = () => {
             return <div className="w-6 h-6 rounded bg-white dark:bg-zinc-700 flex-shrink-0" style={{ boxShadow: value }} />;
         }
         if (type === 'spacing' || type === 'sizing') {
-            return (
+             return (
                 <div className="h-5 bg-violet-500/20 border border-violet-500/50 rounded flex items-center justify-center flex-shrink-0" style={{ width: value, minWidth: '12px', maxWidth: '48px' }}>
                     <span className="text-[8px] text-violet-600 dark:text-violet-400 font-mono">{value}</span>
-                </div>
-            );
+                 </div>
+             );
         }
         if (type === 'typography') {
             return <div className="text-xs text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded font-mono flex-shrink-0">{value}</div>;
@@ -647,26 +646,6 @@ export const TokenManager: React.FC = () => {
                             <FileJson size={16} />
                         </button>
                         
-                        {/* Divider */}
-                        <div className="w-px h-6 bg-zinc-200/60 dark:bg-zinc-700/60 mx-1" />
-
-                        {/* View Toggle */}
-                        <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded p-0.5 border border-zinc-200/60 dark:border-zinc-700/60">
-                            <button 
-                                onClick={() => setViewMode('grid')}
-                                title="Grid View"
-                                className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                            >
-                                <LayoutGrid size={14} />
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('list')}
-                                title="List View"
-                                className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                            >
-                                <ListIcon size={14} />
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -705,49 +684,7 @@ export const TokenManager: React.FC = () => {
                             </div>
                         )}
 
-                        {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                {filteredTokens.map(token => (
-                                    <div key={token._id} className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-3 hover:shadow-sm transition-shadow group">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            {renderTokenPreview(token.type as TokenType, token.value)}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-sm text-zinc-900 dark:text-white truncate" title={token.name}>{token.name}</p>
-                                                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate" title={token.value}>{token.value}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {editingId === token._id ? (
-                                                 <div className="flex gap-2 w-full">
-                                                    <input 
-                                                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 text-xs px-2 h-6 rounded text-zinc-900 dark:text-white"
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                    />
-                                                    <button onClick={() => handleSave(token._id)} className="text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 p-1 rounded"><Save size={12}/></button>
-                                                 </div>
-                                            ) : (
-                                                <>
-                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{token.type}</span>
-                                                    <div className="flex gap-1">
-                                                        <button onClick={() => handleEdit(token)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><Edit2 size={12}/></button>
-                                                        <button onClick={() => handleDelete(token._id)} className="text-zinc-400 hover:text-red-500 p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><Trash2 size={12}/></button>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                <button 
-                                    onClick={() => setShowAddModal(true)}
-                                    className="flex flex-col items-center justify-center p-4 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-500 dark:hover:border-zinc-500 transition-colors min-h-[80px]"
-                                >
-                                    <Plus size={20} className="mb-1 opacity-50" />
-                                    <span className="text-xs font-medium">Add Token</span>
-                                </button>
-                            </div>
-                        ) : (
+                        {filteredTokens.length > 0 && (
                             <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200/60 dark:border-zinc-800/60">
@@ -833,10 +770,10 @@ export const TokenManager: React.FC = () => {
                                 {tokenFiles.map((file) => (
                                     <div 
                                         key={file._id} 
-                                        className={`p-3 rounded-lg border transition-all ${
+                                        className={`p-3 rounded-lg transition-all ${
                                             file.isActive 
-                                                ? 'bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700' 
-                                                : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 opacity-50'
+                                                ? 'bg-zinc-50 dark:bg-zinc-800/50' 
+                                                : 'opacity-50'
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
@@ -1049,10 +986,10 @@ export const TokenManager: React.FC = () => {
                             <div className="flex gap-3">
                                 <div className="flex-1">
                                     <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
-                                    <input
-                                        type="text"
-                                        value={newToken.name}
-                                        onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
+                                <input
+                                    type="text"
+                                    value={newToken.name}
+                                    onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
                                         placeholder="e.g., primary.500"
                                         className="w-full h-8 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                     />
