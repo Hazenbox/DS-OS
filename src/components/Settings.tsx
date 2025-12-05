@@ -1,35 +1,61 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Moon, Sun, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Moon, Sun, Monitor, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ThemeMode } from '../App';
 
 interface SettingsProps {
-    theme: 'light' | 'dark';
-    toggleTheme: () => void;
+    themeMode: ThemeMode;
+    resolvedTheme: 'light' | 'dark';
+    onThemeModeChange: (mode: ThemeMode) => void;
 }
 
-// Toggle Switch Component
-const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void; label?: string }> = ({ enabled, onChange, label }) => {
+// Theme Switcher Component
+const ThemeSwitcher: React.FC<{
+    value: ThemeMode;
+    onChange: (mode: ThemeMode) => void;
+    resolvedTheme: 'light' | 'dark';
+}> = ({ value, onChange, resolvedTheme }) => {
+    const options: { mode: ThemeMode; icon: React.ReactNode; label: string }[] = [
+        { mode: 'light', icon: <Sun size={16} />, label: 'Light' },
+        { mode: 'dark', icon: <Moon size={16} />, label: 'Dark' },
+        { mode: 'system', icon: <Monitor size={16} />, label: 'System' },
+    ];
+
     return (
-        <button
-            onClick={onChange}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:ring-offset-2 focus:ring-offset-transparent ${
-                enabled ? 'bg-violet-600' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
-            role="switch"
-            aria-checked={enabled}
-            aria-label={label}
-        >
-            <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                    enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-            />
-        </button>
+        <div className="flex flex-col gap-3">
+            {/* Segmented Control */}
+            <div className="inline-flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                {options.map((option) => (
+                    <button
+                        key={option.mode}
+                        onClick={() => onChange(option.mode)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                            value === option.mode
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
+                                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                        }`}
+                    >
+                        <span className={value === option.mode ? 'text-violet-600 dark:text-violet-400' : ''}>
+                            {option.icon}
+                        </span>
+                        {option.label}
+                    </button>
+                ))}
+            </div>
+            
+            {/* Current theme indicator */}
+            {value === 'system' && (
+                <p className="text-xs text-muted flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    Currently using {resolvedTheme} theme based on system preference
+                </p>
+            )}
+        </div>
     );
 };
 
-export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
+export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, onThemeModeChange }) => {
     const [geminiKey, setGeminiKey] = useState('');
     const [showGeminiKey, setShowGeminiKey] = useState(false);
     const [isGeminiSaving, setIsGeminiSaving] = useState(false);
@@ -46,10 +72,9 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
     const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus);
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
 
-    const handleThemeToggle = async () => {
-        toggleTheme();
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        await setThemeSetting({ key: 'theme', value: newTheme });
+    const handleThemeModeChange = async (mode: ThemeMode) => {
+        onThemeModeChange(mode);
+        await setThemeSetting({ key: 'themeMode', value: mode });
     };
 
     const handleSaveGeminiKey = async () => {
@@ -81,7 +106,14 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
         }
     };
 
-    const isDarkMode = theme === 'dark';
+    const getThemeIcon = () => {
+        if (themeMode === 'system') {
+            return <Monitor size={20} className="text-violet-500" />;
+        }
+        return resolvedTheme === 'dark' 
+            ? <Moon size={20} className="text-violet-500" /> 
+            : <Sun size={20} className="text-amber-500" />;
+    };
 
     return (
         <div className="flex flex-col h-full">
@@ -94,25 +126,23 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-2xl mx-auto space-y-6">
                     
-                    {/* Appearance */}
+                    {/* Appearance / Theme */}
                     <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center">
-                                    {isDarkMode ? <Moon size={20} className="text-violet-500" /> : <Sun size={20} className="text-amber-500" />}
-                                </div>
-                                <div>
-                                    <h3 className="font-medium text-primary">Dark Mode</h3>
-                                    <p className="text-sm text-muted">
-                                        {isDarkMode ? 'Dark theme is enabled' : 'Switch to dark theme'}
-                                    </p>
-                                </div>
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center flex-shrink-0">
+                                {getThemeIcon()}
                             </div>
-                            <ToggleSwitch 
-                                enabled={isDarkMode} 
-                                onChange={handleThemeToggle}
-                                label="Toggle dark mode"
-                            />
+                            <div className="flex-1">
+                                <h3 className="font-medium text-primary mb-1">Appearance</h3>
+                                <p className="text-sm text-muted mb-4">
+                                    Choose your preferred theme or sync with your system settings.
+                                </p>
+                                <ThemeSwitcher 
+                                    value={themeMode}
+                                    onChange={handleThemeModeChange}
+                                    resolvedTheme={resolvedTheme}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -144,7 +174,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                             value={figmaPat}
                                             onChange={(e) => setFigmaPat(e.target.value)}
                                             placeholder={figmaPatStatus?.configured ? 'Enter new token to replace' : 'figd_xxxxxxxxxxxxx'}
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-primary focus:outline-none focus:border-accent pr-10"
+                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-primary focus:outline-none focus:border-violet-500 pr-10"
                                         />
                                         <button
                                             onClick={() => setShowFigmaPat(!showFigmaPat)}
@@ -211,7 +241,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                             value={geminiKey}
                                             onChange={(e) => setGeminiKey(e.target.value)}
                                             placeholder="Enter your Gemini API key"
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-primary focus:outline-none focus:border-accent pr-10"
+                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-primary focus:outline-none focus:border-violet-500 pr-10"
                                         />
                                         <button
                                             onClick={() => setShowGeminiKey(!showGeminiKey)}

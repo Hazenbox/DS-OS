@@ -21,9 +21,12 @@ interface User {
   role: string;
 }
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const [isSeeding, setIsSeeding] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   
@@ -36,6 +39,44 @@ const App: React.FC = () => {
   const oauthProvider = isOAuthCallback 
     ? window.location.pathname.split('/').pop() as 'google' | 'github'
     : null;
+
+  // Load saved theme mode on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('themeMode') as ThemeMode | null;
+    if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+      setThemeMode(savedTheme);
+    }
+  }, []);
+
+  // Handle system theme detection and changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const updateResolvedTheme = () => {
+      if (themeMode === 'system') {
+        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+      } else {
+        setResolvedTheme(themeMode);
+      }
+    };
+
+    updateResolvedTheme();
+
+    // Listen for system theme changes
+    const handler = () => updateResolvedTheme();
+    mediaQuery.addEventListener('change', handler);
+    
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [themeMode]);
+
+  // Apply theme to document
+  useEffect(() => {
+    if (resolvedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [resolvedTheme]);
 
   // Check for stored user on mount
   useEffect(() => {
@@ -85,16 +126,9 @@ const App: React.FC = () => {
   // Check if data needs seeding
   const needsSeeding = convexTokens !== undefined && convexTokens.length === 0;
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  const handleThemeModeChange = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    localStorage.setItem('themeMode', mode);
   };
 
   const handleSeedData = async () => {
@@ -211,7 +245,7 @@ const App: React.FC = () => {
       case 'releases':
         return <ReleaseManager components={components} />;
       case 'settings':
-        return <Settings theme={theme} toggleTheme={toggleTheme} />;
+        return <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={handleThemeModeChange} />;
       case 'documentation':
         return (
           <div className="flex flex-col h-full">
