@@ -200,23 +200,23 @@ export const Dashboard: React.FC = () => {
                   value={tokenCount.toString()} 
                   icon={<Palette size={16}/>} 
                 />
-                <StatCard 
-                  title="Components" 
-                  value={components.length.toString()} 
-                  icon={<Package size={16}/>} 
+                    <StatCard 
+                        title="Components" 
+                        value={components.length.toString()} 
+                        icon={<Package size={16}/>} 
                   delta={stableCount > 0 ? `${stableCount} stable` : undefined} 
-                />
-                <StatCard 
-                  title="In Review" 
+                    />
+                    <StatCard 
+                        title="In Review" 
                   value={reviewCount.toString()} 
-                  icon={<CheckCircle size={16}/>} 
-                />
-                <StatCard 
-                  title="Version" 
+                        icon={<CheckCircle size={16}/>} 
+                    />
+                    <StatCard 
+                        title="Version" 
                   value={currentVersion} 
-                  icon={<GitBranch size={16}/>} 
-                />
-              </div>
+                        icon={<GitBranch size={16}/>} 
+                    />
+                </div>
             )}
 
             {/* Component Status Table */}

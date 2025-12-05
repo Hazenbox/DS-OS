@@ -8,8 +8,7 @@ import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
 import { TableSkeleton, FileSkeleton } from './LoadingSpinner';
 
-const TABS: { id: TokenType | 'all'; label: string }[] = [
-    { id: 'all', label: 'All' },
+const TABS: { id: TokenType; label: string }[] = [
     { id: 'color', label: 'Colors' },
     { id: 'typography', label: 'Typography' },
     { id: 'spacing', label: 'Spacing' },
@@ -353,7 +352,7 @@ const parseTokensFromJSON = (json: any): ParsedToken[] => {
 
 export const TokenManager: React.FC = () => {
     const { projectId, userId } = useProject();
-    const [activeTab, setActiveTab] = useState<TokenType | 'all'>('all');
+    const [activeTab, setActiveTab] = useState<TokenType>('color');
     const [showFiles, setShowFiles] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -395,9 +394,7 @@ export const TokenManager: React.FC = () => {
     const removeFile = useMutation(api.tokenFiles.remove);
 
     // Filter tokens by active tab
-    const filteredTokens = activeTab === 'all' 
-        ? (tokens || []) 
-        : (tokens || []).filter(t => t.type === activeTab);
+    const filteredTokens = (tokens || []).filter(t => t.type === activeTab);
 
     const handleEdit = (token: ConvexToken) => {
         setEditingId(token._id);
@@ -589,7 +586,6 @@ export const TokenManager: React.FC = () => {
     // Get token counts per type for tabs
     const tokenCounts = (tokens || []).reduce((acc, t) => {
         acc[t.type] = (acc[t.type] || 0) + 1;
-        acc.all = (acc.all || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
@@ -687,9 +683,7 @@ export const TokenManager: React.FC = () => {
                         {/* Empty State */}
                         {!isLoadingTokens && filteredTokens.length === 0 && (
                             <div className="w-full py-12 text-center text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
-                                {activeTab === 'all' 
-                                    ? 'No tokens found. Upload a JSON file to get started.' 
-                                    : `No ${activeTab} tokens found. Try the "All" tab to see all tokens.`}
+                                No {activeTab} tokens found. Upload a JSON file to get started.
                             </div>
                         )}
 
@@ -699,19 +693,22 @@ export const TokenManager: React.FC = () => {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200/60 dark:border-zinc-800/60">
                                         <tr>
-                                            <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs w-10"></th>
+                                            {activeTab !== 'typography' && (
+                                                <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs w-10"></th>
+                                            )}
                                             <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs">Name</th>
                                             <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs">Value</th>
-                                            <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs w-20">Type</th>
                                             <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400 text-xs text-right w-20">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                                         {filteredTokens.map(token => (
                                             <tr key={token._id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                                                <td className="px-4 py-2">
-                                                    {renderTokenPreview(token.type as TokenType, token.value)}
-                                                </td>
+                                                {activeTab !== 'typography' && (
+                                                    <td className="px-4 py-2">
+                                                        {renderTokenPreview(token.type as TokenType, token.value)}
+                                                    </td>
+                                                )}
                                                 <td className="px-4 py-2 font-medium text-zinc-900 dark:text-white">
                                                     <span className="truncate block max-w-[250px]" title={token.name}>{token.name}</span>
                                                 </td>
@@ -726,9 +723,6 @@ export const TokenManager: React.FC = () => {
                                                             <button onClick={() => handleSave(token._id)} className="text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 p-1 rounded"><Save size={12}/></button>
                                                          </div>
                                                      ) : <span className="truncate block max-w-[180px]" title={token.value}>{token.value}</span>}
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">{token.type}</span>
                                                 </td>
                                                 <td className="px-4 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <div className="flex justify-end gap-1">
@@ -749,7 +743,7 @@ export const TokenManager: React.FC = () => {
             {/* Files Side Panel */}
             {showFiles && (
                 <div className="w-72 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col transition-all">
-                    <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60">
+                    <div className="px-6 py-[29px] border-b border-zinc-200/60 dark:border-zinc-800/60">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Source Files</h3>
                             <span className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -779,7 +773,7 @@ export const TokenManager: React.FC = () => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-1">
+                            <div className="space-y-3">
                                 {tokenFiles.map((file) => (
                                     <div 
                                         key={file._id} 
@@ -822,19 +816,19 @@ export const TokenManager: React.FC = () => {
                                                     </div>
                                                     
                                                     <div className="flex items-center gap-1">
-                                                        {/* Toggle Switch */}
+                                                        {/* Toggle Switch - Small */}
                                                         <button
                                                             onClick={() => handleFileToggle(file._id)}
                                                             title={file.isActive ? 'Disable' : 'Enable'}
-                                                            className={`relative w-9 h-5 rounded-full transition-colors ${
+                                                            className={`relative w-7 h-4 rounded-full transition-colors ${
                                                                 file.isActive 
                                                                     ? 'bg-violet-600' 
                                                                     : 'bg-zinc-300 dark:bg-zinc-600'
                                                             }`}
                                                         >
                                                             <span 
-                                                                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${
-                                                                    file.isActive ? 'left-[18px]' : 'left-0.5'
+                                                                className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all ${
+                                                                    file.isActive ? 'left-[14px]' : 'left-0.5'
                                                                 }`}
                                                             />
                                                         </button>
@@ -880,7 +874,7 @@ export const TokenManager: React.FC = () => {
                                 
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full p-2 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-500 dark:hover:border-zinc-500 transition-colors flex items-center justify-center gap-2 text-xs"
+                                    className="w-full mt-2 p-2 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-500 dark:hover:border-zinc-500 transition-colors flex items-center justify-center gap-2 text-xs"
                                 >
                                     <Upload size={12} /> Upload More
                                 </button>
