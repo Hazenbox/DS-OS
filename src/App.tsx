@@ -9,7 +9,7 @@ import { ReleaseManager } from './components/ReleaseManager';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
-import { EmailVerification } from './components/EmailVerification';
+import { OAuthCallback } from './components/OAuthCallback';
 import { ViewState, convexTokenToLegacy, convexComponentToLegacy, convexActivityToLegacy } from './types';
 import { BookOpen, MessageSquare, Loader2, Database } from 'lucide-react';
 
@@ -17,6 +17,7 @@ interface User {
   userId: string;
   email: string;
   name?: string;
+  image?: string;
   role: string;
 }
 
@@ -30,8 +31,17 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<'login' | 'signup' | null>(null);
 
+  // Check if this is an OAuth callback
+  const isOAuthCallback = window.location.pathname.startsWith('/auth/callback/');
+  const oauthProvider = isOAuthCallback 
+    ? window.location.pathname.split('/').pop() as 'google' | 'github'
+    : null;
+
   // Check for stored user on mount
   useEffect(() => {
+    // Don't check user storage if this is an OAuth callback
+    if (isOAuthCallback) return;
+    
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -44,7 +54,7 @@ const App: React.FC = () => {
     } else {
       setAuthView('login');
     }
-  }, []);
+  }, [isOAuthCallback]);
 
   // Convex queries
   const convexTokens = useQuery(api.tokens.list, {});
@@ -117,6 +127,11 @@ const App: React.FC = () => {
     setUser(null);
     setAuthView('login');
   };
+
+  // Handle OAuth callback
+  if (isOAuthCallback && oauthProvider) {
+    return <OAuthCallback provider={oauthProvider} />;
+  }
 
   // Show auth screens if not logged in
   if (!user) {

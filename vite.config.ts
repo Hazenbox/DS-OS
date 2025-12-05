@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        // Enable history API fallback for SPA routing
+        historyApiFallback: true,
       },
       plugins: [react()],
       define: {
@@ -22,6 +24,17 @@ export default defineConfig(({ mode }) => {
       // Optimize Convex
       optimizeDeps: {
         include: ['convex/react', 'convex/browser'],
+      },
+      // Build config
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              vendor: ['react', 'react-dom'],
+              convex: ['convex'],
+            },
+          },
+        },
       },
     };
 });
