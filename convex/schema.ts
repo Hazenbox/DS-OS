@@ -142,4 +142,28 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_user", ["userId"]),
+
+  // Rate limiting
+  rateLimits: defineTable({
+    identifier: v.string(), // IP, email, or userId
+    action: v.string(), // AUTH, BULK_IMPORT, API, etc.
+    timestamp: v.number(),
+    success: v.optional(v.boolean()),
+  })
+    .index("by_identifier_action", ["identifier", "action"])
+    .index("by_timestamp", ["timestamp"]),
+
+  // User sessions (for secure session management)
+  sessions: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expiresAt: v.number(),
+    userAgent: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    createdAt: v.number(),
+    lastActiveAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_expires", ["expiresAt"]),
 });

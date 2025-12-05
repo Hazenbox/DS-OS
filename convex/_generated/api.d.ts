@@ -13,8 +13,10 @@ import type * as auth from "../auth.js";
 import type * as components_ from "../components.js";
 import type * as figma from "../figma.js";
 import type * as projects from "../projects.js";
+import type * as rateLimit from "../rateLimit.js";
 import type * as releases from "../releases.js";
 import type * as seed from "../seed.js";
+import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
 import type * as tokens from "../tokens.js";
 
@@ -30,8 +32,10 @@ declare const fullApi: ApiFromModules<{
   components: typeof components_;
   figma: typeof figma;
   projects: typeof projects;
+  rateLimit: typeof rateLimit;
   releases: typeof releases;
   seed: typeof seed;
+  sessions: typeof sessions;
   settings: typeof settings;
   tokens: typeof tokens;
 }>;
