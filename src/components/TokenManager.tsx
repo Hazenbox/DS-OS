@@ -718,7 +718,7 @@ export const TokenManager: React.FC = () => {
 
             {/* Files Side Panel */}
             <div className="w-72 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col">
-                <div className="px-6 py-[26px] border-b border-zinc-200/60 dark:border-zinc-800/60">
+                <div className="px-6 py-[25px] border-b border-zinc-200/60 dark:border-zinc-800/60">
                     <div className="flex items-center justify-between">
                         <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Source Files</h3>
                         <button
