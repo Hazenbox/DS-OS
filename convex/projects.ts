@@ -10,10 +10,9 @@ export const list = query({
     if (!args.userId) {
       return [];
     }
-    return await ctx.db
-      .query("projects")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId!))
-      .collect();
+    // Get projects that belong to this user
+    const allProjects = await ctx.db.query("projects").collect();
+    return allProjects.filter(p => p.userId === args.userId);
   },
 });
 
@@ -26,13 +25,10 @@ export const getActive = query({
     if (!args.userId) {
       return null;
     }
-    const activeProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_user_active", (q) => 
-        q.eq("userId", args.userId!).eq("isActive", true)
-      )
-      .collect();
-    return activeProjects[0] || null;
+    // Get all projects and filter by user and active status
+    const allProjects = await ctx.db.query("projects").collect();
+    const activeProject = allProjects.find(p => p.userId === args.userId && p.isActive);
+    return activeProject || null;
   },
 });
 
@@ -47,15 +43,14 @@ export const create = mutation({
     const now = Date.now();
     
     // Check if this is the first project for this user
-    const existingProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-    const isFirst = existingProjects.length === 0;
+    const allProjects = await ctx.db.query("projects").collect();
+    const userProjects = allProjects.filter(p => p.userId === args.userId);
+    const isFirst = userProjects.length === 0;
     
-    // If making this active, deactivate others for this user
-    if (isFirst) {
-      for (const project of existingProjects) {
+    // If this is the first, it becomes active automatically
+    // Otherwise, deactivate existing active projects for this user
+    if (!isFirst) {
+      for (const project of userProjects) {
         if (project.isActive) {
           await ctx.db.patch(project._id, { isActive: false });
         }
@@ -65,7 +60,7 @@ export const create = mutation({
     const projectId = await ctx.db.insert("projects", {
       name: args.name,
       description: args.description,
-      isActive: isFirst,
+      isActive: true, // New project is always active
       createdAt: now,
       updatedAt: now,
       userId: args.userId,
@@ -98,11 +93,9 @@ export const setActive = mutation({
     }
     
     // Deactivate all projects for this user
-    const allProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-    for (const p of allProjects) {
+    const allProjects = await ctx.db.query("projects").collect();
+    const userProjects = allProjects.filter(p => p.userId === args.userId);
+    for (const p of userProjects) {
       if (p.isActive) {
         await ctx.db.patch(p._id, { isActive: false });
       }
@@ -112,6 +105,23 @@ export const setActive = mutation({
     await ctx.db.patch(args.id, { isActive: true, updatedAt: Date.now() });
     
     return args.id;
+  },
+});
+
+// Migration: Assign orphan projects to a user
+export const migrateOrphanProjects = mutation({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const allProjects = await ctx.db.query("projects").collect();
+    const orphans = allProjects.filter(p => !p.userId);
+    
+    for (const project of orphans) {
+      await ctx.db.patch(project._id, { userId: args.userId });
+    }
+    
+    return { migrated: orphans.length };
   },
 });
 
@@ -158,10 +168,8 @@ export const remove = mutation({
     
     // If we deleted the active project, activate another one for this user
     if (project.isActive) {
-      const remaining = await ctx.db
-        .query("projects")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId))
-        .first();
+      const allProjects = await ctx.db.query("projects").collect();
+      const remaining = allProjects.find(p => p.userId === args.userId && p._id !== args.id);
       if (remaining) {
         await ctx.db.patch(remaining._id, { isActive: true });
       }

@@ -104,7 +104,8 @@ export default defineSchema({
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    userId: v.string(), // Owner's email
+    userId: v.optional(v.string()), // Owner's email
+    createdBy: v.optional(v.string()), // Legacy field for backward compatibility
   })
     .index("by_user", ["userId"])
     .index("by_user_active", ["userId", "isActive"]),
