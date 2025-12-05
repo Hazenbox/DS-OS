@@ -210,7 +210,7 @@ const App: React.FC = () => {
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Documentation</h2>
                 </div>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4 bg-zinc-50 dark:bg-zinc-950">
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
               <BookOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
               <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Docusaurus Integration</h2>
               <p className="max-w-md text-center text-sm">Documentation is auto-generated and hosted on Docusaurus. <br/> <a href="#" className="text-violet-600 dark:text-violet-400 hover:underline">View Live Site</a></p>
@@ -225,7 +225,7 @@ const App: React.FC = () => {
                         <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Feedback</h2>
                     </div>
                 </div>
-                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4 bg-zinc-50 dark:bg-zinc-950">
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
                   <MessageSquare size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
                   <h2 className="text-lg font-medium text-zinc-900 dark:text-white">No New Feedback</h2>
                   <p className="text-sm">No new tickets from Storybook or Docs integration.</p>

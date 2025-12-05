@@ -258,14 +258,14 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
 
             <div>
               <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
                 placeholder="you@company.com"
-              />
+                />
             </div>
 
             <div>
@@ -308,11 +308,11 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
           </form>
 
           <p className="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-500">
-            Already have an account?{' '}
+              Already have an account?{' '}
             <button onClick={onSwitchToLogin} className="text-violet-600 dark:text-violet-400 hover:underline font-medium">
-              Sign in
-            </button>
-          </p>
+                Sign in
+              </button>
+            </p>
         </div>
       </div>
     </div>

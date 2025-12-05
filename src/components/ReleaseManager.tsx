@@ -147,7 +147,7 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-zinc-50 dark:bg-zinc-950">
+            <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
                         <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">Pipeline Status</h3>

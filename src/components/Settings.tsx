@@ -126,7 +126,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-zinc-50 dark:bg-zinc-950">
+            <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-2xl mx-auto space-y-6">
                     
                     {/* Appearance / Theme */}

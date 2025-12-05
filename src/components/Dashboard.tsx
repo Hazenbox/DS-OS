@@ -76,25 +76,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                     />
                 </div>
 
-                <div className="space-y-4">
+                    <div className="space-y-4">
                     <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Recent Activity</h3>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
-                        {recentActivity.length === 0 ? (
+                            {recentActivity.length === 0 ? (
                             <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-8">No recent activity</p>
-                        ) : (
-                            <ul className="space-y-4">
-                                {recentActivity.map((act) => (
-                                    <li key={act.id} className="flex gap-2 text-sm">
+                            ) : (
+                                <ul className="space-y-4">
+                                    {recentActivity.map((act) => (
+                                        <li key={act.id} className="flex gap-2 text-sm">
                                         <span className="font-semibold text-zinc-900 dark:text-white">{act.user}</span>
                                         <span className="text-zinc-500 dark:text-zinc-400">{act.action}</span>
                                         <span className="text-violet-600 dark:text-violet-400 font-mono truncate">{act.target}</span>
                                         <span className="text-zinc-500 dark:text-zinc-400 ml-auto whitespace-nowrap">
-                                            {new Date(act.timestamp).toLocaleTimeString()}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                                                {new Date(act.timestamp).toLocaleTimeString()}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                     </div>
                 </div>
 

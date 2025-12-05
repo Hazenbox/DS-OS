@@ -210,7 +210,7 @@ export default NewComponent;`,
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: List & Controls */}
-            <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
+            <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900">
                     <div>
                         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
@@ -280,7 +280,7 @@ export default NewComponent;`,
             {selectedComponent ? (
                 <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
                     {/* Header Tabs */}
-                    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-3 justify-between bg-zinc-50 dark:bg-zinc-900/50">
+                    <div className="h-12 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-3 justify-between">
                         <div className="flex gap-1 h-full items-center">
                             <button 
                                 onClick={() => setActiveTab('code')}
@@ -363,7 +363,7 @@ export default NewComponent;`,
                             )}
 
                             {/* Prompt Input */}
-                            <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                            <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
                                 <div className="flex gap-2 items-end">
                                     <textarea
                                         className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-white py-2.5 px-3 resize-none placeholder:text-zinc-400 focus:outline-none focus:border-violet-500 min-h-[44px] max-h-24"
@@ -404,7 +404,7 @@ export default NewComponent;`,
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 flex items-center justify-center text-zinc-500 dark:text-zinc-400 flex-col gap-4 bg-zinc-50 dark:bg-zinc-900/50">
+                <div className="flex-1 flex items-center justify-center text-zinc-500 dark:text-zinc-400 flex-col gap-4">
                     <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center">
                         <Zap size={24} />
                     </div>

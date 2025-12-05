@@ -18,7 +18,7 @@ export const signup = mutation({
     if (existingUser) {
       throw new Error("User with this email already exists");
     }
-
+    
     // Create user with email auto-verified
     const userId = await ctx.db.insert("users", {
       email: args.email,

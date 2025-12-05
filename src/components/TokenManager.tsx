@@ -322,7 +322,7 @@ export const TokenManager: React.FC = () => {
                         ))}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 bg-zinc-50 dark:bg-zinc-950">
+                    <div className="flex-1 overflow-y-auto p-6">
                         {filteredTokens.length === 0 && (
                             <div className="w-full py-12 text-center text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
                                 No tokens found for {activeTab}. Import a JSON file or add manually.
