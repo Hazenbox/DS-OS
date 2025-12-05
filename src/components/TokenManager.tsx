@@ -6,6 +6,7 @@ import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
 import { Plus, Trash2, Edit2, Save, Upload, Download, X, FileJson, Check, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
+import { TableSkeleton, FileSkeleton } from './LoadingSpinner';
 
 const TABS: { id: TokenType | 'all'; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -376,6 +377,10 @@ export const TokenManager: React.FC = () => {
     // Convex queries - scoped to project
     const tokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
     const tokenFiles = useQuery(api.tokenFiles.list, projectId ? { projectId } : "skip") as TokenFile[] | undefined;
+    
+    // Loading states
+    const isLoadingTokens = tokens === undefined && projectId;
+    const isLoadingFiles = tokenFiles === undefined && projectId;
 
     // Convex mutations
     const createToken = useMutation(api.tokens.create);
@@ -676,7 +681,11 @@ export const TokenManager: React.FC = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6">
-                        {filteredTokens.length === 0 && (
+                        {/* Loading State */}
+                        {isLoadingTokens && <TableSkeleton rows={6} cols={5} />}
+                        
+                        {/* Empty State */}
+                        {!isLoadingTokens && filteredTokens.length === 0 && (
                             <div className="w-full py-12 text-center text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
                                 {activeTab === 'all' 
                                     ? 'No tokens found. Upload a JSON file to get started.' 
@@ -684,7 +693,8 @@ export const TokenManager: React.FC = () => {
                             </div>
                         )}
 
-                        {filteredTokens.length > 0 && (
+                        {/* Token List */}
+                        {!isLoadingTokens && filteredTokens.length > 0 && (
                             <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200/60 dark:border-zinc-800/60">
@@ -749,7 +759,10 @@ export const TokenManager: React.FC = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4">
-                        {(!tokenFiles || tokenFiles.length === 0) ? (
+                        {/* Loading State */}
+                        {isLoadingFiles ? (
+                            <FileSkeleton count={3} />
+                        ) : (!tokenFiles || tokenFiles.length === 0) ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-4">
                                 <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
                                     <FileJson size={18} className="text-zinc-400" />

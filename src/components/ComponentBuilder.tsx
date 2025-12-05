@@ -7,6 +7,7 @@ import { generateComponentCode, generateDocumentation } from '../services/gemini
 import { Send, Zap, Code, FileText, Loader2, Trash2, Play, Eye, EyeOff, Copy, Check, Figma } from 'lucide-react';
 import { FigmaComponentGenerator } from './FigmaComponentGenerator';
 import { useProject } from '../contexts/ProjectContext';
+import { LoadingSpinner } from './LoadingSpinner';
 import Editor from '@monaco-editor/react';
 import { 
   SandpackProvider, 
@@ -85,6 +86,9 @@ export const ComponentBuilder: React.FC = () => {
 
     // Convex queries - scoped to project
     const components = useQuery(api.components.list, projectId ? { projectId } : "skip");
+    
+    // Loading state
+    const isLoading = components === undefined && projectId;
 
     // Convex mutations
     const createComponent = useMutation(api.components.create);
@@ -236,7 +240,16 @@ export default NewComponent;`,
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {components?.map(c => (
+                    {isLoading ? (
+                        <div className="flex items-center justify-center h-32">
+                            <LoadingSpinner size="sm" message="Loading..." />
+                        </div>
+                    ) : components?.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-32 text-center p-4">
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">No components yet</p>
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500">Click "+ New" to create one</p>
+                        </div>
+                    ) : components?.map(c => (
                         <div 
                             key={c._id} 
                             onClick={() => handleSelectComponent(c._id)}

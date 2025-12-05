@@ -4,6 +4,7 @@ import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
 import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Plus, Edit2, Trash2, Download, Upload, Rocket } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { CardSkeleton, TimelineSkeleton } from './LoadingSpinner';
 
 // Action icons and colors
 const ACTION_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; verb: string }> = {
@@ -137,6 +138,10 @@ export const Dashboard: React.FC = () => {
   const convexActivity = useQuery(api.activity.list, projectId ? { projectId, limit: 50 } : "skip");
   const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
 
+  // Loading states
+  const isLoadingStats = (convexTokens === undefined || convexComponents === undefined) && projectId;
+  const isLoadingActivity = convexActivity === undefined && projectId;
+
   const tokens = convexTokens || [];
   const components = (convexComponents || []).map(convexComponentToLegacy);
   const activity = (convexActivity || []).map(convexActivityToLegacy);
@@ -186,29 +191,33 @@ export const Dashboard: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl space-y-8">
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard 
-                title="Tokens" 
-                value={tokenCount.toString()} 
-                icon={<Palette size={16}/>} 
-              />
-                    <StatCard 
-                        title="Components" 
-                        value={components.length.toString()} 
-                        icon={<Package size={16}/>} 
-                delta={stableCount > 0 ? `${stableCount} stable` : undefined} 
-                    />
-                    <StatCard 
-                        title="In Review" 
-                value={reviewCount.toString()} 
-                        icon={<CheckCircle size={16}/>} 
-                    />
-                    <StatCard 
-                        title="Version" 
-                value={currentVersion} 
-                        icon={<GitBranch size={16}/>} 
-                    />
-                </div>
+            {isLoadingStats ? (
+              <CardSkeleton count={4} />
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard 
+                  title="Tokens" 
+                  value={tokenCount.toString()} 
+                  icon={<Palette size={16}/>} 
+                />
+                <StatCard 
+                  title="Components" 
+                  value={components.length.toString()} 
+                  icon={<Package size={16}/>} 
+                  delta={stableCount > 0 ? `${stableCount} stable` : undefined} 
+                />
+                <StatCard 
+                  title="In Review" 
+                  value={reviewCount.toString()} 
+                  icon={<CheckCircle size={16}/>} 
+                />
+                <StatCard 
+                  title="Version" 
+                  value={currentVersion} 
+                  icon={<GitBranch size={16}/>} 
+                />
+              </div>
+            )}
 
             {/* Component Status Table */}
                     <div className="space-y-4">
@@ -288,7 +297,9 @@ export const Dashboard: React.FC = () => {
 
         {/* Activity List */}
         <div className="flex-1 overflow-y-auto p-3">
-          {filteredActivity.length === 0 ? (
+          {isLoadingActivity ? (
+            <TimelineSkeleton count={5} />
+          ) : filteredActivity.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
               <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
                 <Clock size={20} className="text-zinc-400" />

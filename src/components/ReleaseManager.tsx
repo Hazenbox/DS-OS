@@ -4,15 +4,19 @@ import { api } from '../../convex/_generated/api';
 import { DeploymentStatus, convexComponentToLegacy } from '../types';
 import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { CardSkeleton, TableSkeleton } from './LoadingSpinner';
 
 export const ReleaseManager: React.FC = () => {
-    const { projectId } = useProject();
+    const { projectId, userId } = useProject();
     const [activeDeploy, setActiveDeploy] = useState<DeploymentStatus[] | null>(null);
 
     // Convex queries - scoped to project
     const convexComponents = useQuery(api.components.list, projectId ? { projectId } : "skip");
     const releases = useQuery(api.releases.list, projectId ? { projectId } : "skip");
     const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
+
+    // Loading state
+    const isLoading = (convexComponents === undefined || releases === undefined) && projectId;
 
     // Convex mutations
     const createRelease = useMutation(api.releases.create);
@@ -38,6 +42,7 @@ export const ReleaseManager: React.FC = () => {
         try {
             const releaseId = await createRelease({
                 projectId,
+                userId: userId || '',
                 version: newVersion,
                 changelog: generateChangelog(),
                 components: components.map(c => c.id),
@@ -49,7 +54,7 @@ export const ReleaseManager: React.FC = () => {
                 if (currentStep >= steps.length) {
                     clearInterval(interval);
                     // Mark release as published
-                    updateReleaseStatus({ id: releaseId, status: 'published' });
+                    updateReleaseStatus({ id: releaseId, status: 'published', userId: userId || '' });
                     return;
                 }
 
@@ -151,6 +156,12 @@ export const ReleaseManager: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
+                {isLoading ? (
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        <CardSkeleton count={1} />
+                        <TableSkeleton rows={4} cols={4} />
+                    </div>
+                ) : (
                 <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">Pipeline Status</h3>
@@ -230,6 +241,7 @@ export const ReleaseManager: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                )}
             </div>
         </div>
     );
