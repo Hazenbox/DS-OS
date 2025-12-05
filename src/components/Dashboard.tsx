@@ -2,8 +2,52 @@ import React, { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
-import { CheckCircle, GitBranch, Package, Palette, Clock } from 'lucide-react';
+import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Plus, Edit2, Trash2, Download, Upload, Rocket } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+
+// Action icons and colors
+const ACTION_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; verb: string }> = {
+  create: { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10', icon: <Plus size={12} />, verb: 'created' },
+  update: { color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', icon: <Edit2 size={12} />, verb: 'updated' },
+  delete: { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: <Trash2 size={12} />, verb: 'deleted' },
+  import: { color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10', icon: <Upload size={12} />, verb: 'imported' },
+  download: { color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10', icon: <Download size={12} />, verb: 'exported' },
+  release: { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', icon: <Rocket size={12} />, verb: 'released' },
+};
+
+// Extract readable name from user identifier
+const getUserDisplayName = (user: string): string => {
+  // If it's an email, extract and format the username part
+  if (user.includes('@')) {
+    const username = user.split('@')[0];
+    // Convert snake_case or kebab-case to Title Case
+    return username
+      .split(/[._-]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+  // Otherwise return as-is (assuming it's already a display name)
+  return user;
+};
+
+// Format activity into a clear sentence
+const formatActivityDescription = (activity: { target: string; targetType: string; action: string }): string => {
+  // Extract the item name from target (e.g., "Token: primary-500" -> "primary-500")
+  const itemName = activity.target.includes(':') 
+    ? activity.target.split(':')[1].trim()
+    : activity.target;
+  
+  // Get readable target type
+  const typeLabels: Record<string, string> = {
+    token: 'token',
+    component: 'component',
+    release: 'release',
+    system: 'system',
+  };
+  const type = typeLabels[activity.targetType] || activity.targetType;
+  
+  return `"${itemName}" ${type}`;
+};
 
 // Relative time formatter
 const getRelativeTime = (timestamp: number): string => {
@@ -35,7 +79,7 @@ const getTimeCategory = (timestamp: number): string => {
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; delta?: string }> = ({ title, value, icon, delta }) => (
   <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 p-4 rounded-lg">
-    <div className="flex justify-between items-start mb-2">
+        <div className="flex justify-between items-start mb-2">
       <span className="text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">{title}</span>
       <span className="text-zinc-400 dark:text-zinc-500">{icon}</span>
     </div>
@@ -44,65 +88,37 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
   </div>
 );
 
-// Format activity into readable sentence
-const formatActivitySentence = (activity: { user: string; action: string; target: string; targetType: string }): string => {
-  // Extract clean name from email or use as-is
-  const userName = activity.user.includes('@') 
-    ? activity.user.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    : activity.user;
-  
-  // Extract the actual item name from target (e.g., "Token: primary" -> "primary")
-  const itemName = activity.target.includes(':') 
-    ? activity.target.split(':')[1].trim()
-    : activity.target;
-
-  const actionVerbs: Record<string, string> = {
-    create: 'created',
-    update: 'updated',
-    delete: 'deleted',
-    import: 'imported',
-    download: 'exported',
-    release: 'released',
-  };
-
-  const verb = actionVerbs[activity.action] || activity.action;
-  
-  return `"${itemName}" was ${verb} by ${userName}`;
-};
-
 // Activity Item Component
 const ActivityItem: React.FC<{ 
   activity: { id: string; user: string; action: string; target: string; targetType: string; timestamp: number };
   isLast: boolean;
 }> = ({ activity, isLast }) => {
-  const dotColors: Record<string, string> = {
-    create: 'bg-green-500',
-    update: 'bg-blue-500',
-    delete: 'bg-red-500',
-    import: 'bg-violet-500',
-    download: 'bg-cyan-500',
-    release: 'bg-amber-500',
-  };
-  
-  const dotColor = dotColors[activity.action] || 'bg-zinc-400';
+  const actionConfig = ACTION_CONFIG[activity.action] || ACTION_CONFIG.update;
+  const userName = getUserDisplayName(activity.user);
+  const description = formatActivityDescription(activity);
   
   return (
-    <div className="relative">
+    <div className="relative group">
       {/* Timeline connector */}
       {!isLast && (
-        <div className="absolute left-[5px] top-4 w-px h-[calc(100%+4px)] bg-zinc-200 dark:bg-zinc-800" />
+        <div className="absolute left-[9px] top-7 w-px h-[calc(100%-4px)] bg-zinc-200 dark:bg-zinc-700/50" />
       )}
       
-      <div className="flex gap-3 py-2 group">
-        {/* Timeline dot */}
-        <div className={`w-[11px] h-[11px] rounded-full ${dotColor} flex-shrink-0 mt-1 ring-2 ring-white dark:ring-zinc-900`} />
+      <div className="flex gap-3 p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
+        {/* Timeline dot with icon */}
+        <div className={`w-[18px] h-[18px] rounded-full ${actionConfig.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ring-2 ring-white dark:ring-zinc-900`}>
+          <span className={actionConfig.color}>{actionConfig.icon}</span>
+        </div>
         
         {/* Content */}
-        <div className="flex-1 min-w-0 -mt-0.5">
-          <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-            {formatActivitySentence(activity)}
-          </p>
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+              {description} {actionConfig.verb} by <span className="font-medium text-zinc-900 dark:text-white">{userName}</span>
+            </p>
+            <ChevronRight size={14} className="text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+          </div>
+          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
             {getRelativeTime(activity.timestamp)}
           </p>
         </div>
@@ -158,13 +174,13 @@ export const Dashboard: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
-          <div>
+            <div>
             <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Overview</h2>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             Connected
-          </div>
+            </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
@@ -176,64 +192,64 @@ export const Dashboard: React.FC = () => {
                 value={tokenCount.toString()} 
                 icon={<Palette size={16}/>} 
               />
-              <StatCard 
-                title="Components" 
-                value={components.length.toString()} 
-                icon={<Package size={16}/>} 
+                    <StatCard 
+                        title="Components" 
+                        value={components.length.toString()} 
+                        icon={<Package size={16}/>} 
                 delta={stableCount > 0 ? `${stableCount} stable` : undefined} 
-              />
-              <StatCard 
-                title="In Review" 
+                    />
+                    <StatCard 
+                        title="In Review" 
                 value={reviewCount.toString()} 
-                icon={<CheckCircle size={16}/>} 
-              />
-              <StatCard 
-                title="Version" 
+                        icon={<CheckCircle size={16}/>} 
+                    />
+                    <StatCard 
+                        title="Version" 
                 value={currentVersion} 
-                icon={<GitBranch size={16}/>} 
-              />
-            </div>
+                        icon={<GitBranch size={16}/>} 
+                    />
+                </div>
 
             {/* Component Status Table */}
-            <div className="space-y-4">
+                    <div className="space-y-4">
               <h3 className="text-sm font-semibold text-zinc-900 dark:text-white uppercase tracking-wider">Component Status</h3>
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+                        <table className="w-full text-sm">
                   <thead className="bg-zinc-50 dark:bg-zinc-800/50">
-                    <tr>
+                                <tr>
                       <th className="px-4 py-3 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Component</th>
                       <th className="px-4 py-3 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Status</th>
                       <th className="px-4 py-3 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Version</th>
-                    </tr>
-                  </thead>
+                                </tr>
+                            </thead>
                   <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
                     {components.slice(0, 5).map(comp => (
                       <tr key={comp.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                         <td className="px-4 py-3 font-medium text-zinc-900 dark:text-white">{comp.name}</td>
-                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3">
                           <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-medium ${
-                            comp.status === 'stable' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
-                            comp.status === 'review' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
-                            comp.status === 'deprecated' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                            'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'
-                          }`}>
-                            {comp.status}
-                          </span>
-                        </td>
+                                                comp.status === 'stable' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                                                comp.status === 'review' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                                                comp.status === 'deprecated' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                                'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'
+                                            }`}>
+                                                {comp.status}
+                                            </span>
+                                        </td>
                         <td className="px-4 py-3 font-mono text-xs text-zinc-500 dark:text-zinc-400">{comp.version}</td>
-                      </tr>
-                    ))}
-                    {components.length === 0 && (
-                      <tr>
+                                    </tr>
+                                ))}
+                                {components.length === 0 && (
+                                    <tr>
                         <td colSpan={3} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400 text-sm">
-                          No components yet. Create one in the Builder.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                                            No components yet. Create one in the Builder.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
           </div>
         </div>
       </div>
@@ -305,8 +321,8 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
           )}
+            </div>
         </div>
-      </div>
     </div>
   );
 };

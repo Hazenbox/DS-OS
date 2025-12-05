@@ -44,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
@@ -82,17 +82,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
 
         {/* Project Dropdown */}
         <div className="relative" ref={projectMenuRef}>
-          <button 
-            onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
-            className="w-full h-8 flex items-center justify-between px-3 text-sm font-medium text-primary bg-black/[0.08] dark:bg-white/[0.05] rounded-lg border border-transparent dark:border-white/10 transition-all duration-200 ease-in-out hover:bg-black/10 dark:hover:bg-white/[0.08]"
-          >
+            <button 
+                onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
+                className="w-full h-8 flex items-center justify-between px-3 text-sm font-medium text-primary bg-black/[0.08] dark:bg-white/[0.05] rounded-lg border border-transparent dark:border-white/10 transition-all duration-200 ease-in-out hover:bg-black/10 dark:hover:bg-white/[0.08]"
+            >
             <span className="truncate">
               {activeProject?.name || 'Select Project'}
             </span>
             <ChevronDown size={14} className={`text-primary/70 transition-transform flex-shrink-0 ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {isProjectMenuOpen && (
+            </button>
+            
+            {isProjectMenuOpen && (
             <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg shadow-lg z-50 py-1 max-h-64 overflow-y-auto">
               <div className="px-3 py-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                 Projects
@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${project.isActive ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
                   <span className="truncate flex-1">{project.name}</span>
                   {project.isActive && <Check size={14} className="text-green-500 flex-shrink-0" />}
-                </button>
+                    </button>
               ))}
               
               <div className="h-px bg-zinc-200/60 dark:bg-zinc-700/60 my-1" />
@@ -126,10 +126,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 }}
                 className="w-full text-left px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
               >
-                <Plus size={14} /> Create Project
-              </button>
-            </div>
-          )}
+                        <Plus size={14} /> Create Project
+                    </button>
+                </div>
+            )}
         </div>
       </div>
 

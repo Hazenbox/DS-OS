@@ -254,6 +254,7 @@ export const bulkImport = mutation({
       description: v.optional(v.string()),
       brand: v.optional(v.string()),
     })),
+    sourceFileId: v.optional(v.id("tokenFiles")),
     clearExisting: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -283,6 +284,7 @@ export const bulkImport = mutation({
         ...token,
         name: token.name.trim(),
         projectId: args.projectId,
+        sourceFileId: args.sourceFileId,
       });
       insertedIds.push(id);
     }
@@ -297,5 +299,29 @@ export const bulkImport = mutation({
     });
     
     return insertedIds;
+  },
+});
+
+// Delete all tokens from a specific file
+export const deleteByFile = mutation({
+  args: {
+    fileId: v.id("tokenFiles"),
+    projectId: v.id("projects"),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify project access
+    await verifyProjectAccess(ctx, args.projectId, args.userId);
+    
+    const tokens = await ctx.db
+      .query("tokens")
+      .withIndex("by_source_file", (q) => q.eq("sourceFileId", args.fileId))
+      .collect();
+    
+    for (const token of tokens) {
+      await ctx.db.delete(token._id);
+    }
+    
+    return { deletedCount: tokens.length };
   },
 });

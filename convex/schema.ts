@@ -2,6 +2,20 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // Token Files - JSON files uploaded by users
+  tokenFiles: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(), // Display name (editable)
+    originalName: v.string(), // Original filename
+    content: v.string(), // JSON content as string
+    tokenCount: v.number(), // Number of tokens in the file
+    isActive: v.boolean(), // Whether to use this file's tokens
+    uploadedAt: v.number(),
+    uploadedBy: v.string(), // User email
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_active", ["projectId", "isActive"]),
+
   // Design Tokens - scoped to project
   tokens: defineTable({
     projectId: v.id("projects"),
@@ -19,11 +33,13 @@ export default defineSchema({
     ),
     description: v.optional(v.string()),
     brand: v.optional(v.string()),
+    sourceFileId: v.optional(v.id("tokenFiles")), // Link to source file
   })
     .index("by_project", ["projectId"])
     .index("by_project_type", ["projectId", "type"])
     .index("by_type", ["type"])
-    .index("by_brand", ["brand"]),
+    .index("by_brand", ["brand"])
+    .index("by_source_file", ["sourceFileId"]),
 
   // Components - scoped to project
   components: defineTable({

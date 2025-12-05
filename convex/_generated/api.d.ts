@@ -19,6 +19,7 @@ import type * as releases from "../releases.js";
 import type * as seed from "../seed.js";
 import type * as sessions from "../sessions.js";
 import type * as settings from "../settings.js";
+import type * as tokenFiles from "../tokenFiles.js";
 import type * as tokens from "../tokens.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   sessions: typeof sessions;
   settings: typeof settings;
+  tokenFiles: typeof tokenFiles;
   tokens: typeof tokens;
 }>;
 
