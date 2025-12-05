@@ -23,6 +23,39 @@ interface User {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// URL path to view mapping
+const pathToView: Record<string, ViewState> = {
+  '/': 'dashboard',
+  '/overview': 'dashboard',
+  '/tokens': 'tokens',
+  '/builder': 'builder',
+  '/releases': 'releases',
+  '/settings': 'settings',
+  '/documentation': 'documentation',
+  '/feedback': 'feedback',
+};
+
+const viewToPath: Record<ViewState, string> = {
+  'dashboard': '/overview',
+  'tokens': '/tokens',
+  'builder': '/builder',
+  'releases': '/releases',
+  'settings': '/settings',
+  'documentation': '/documentation',
+  'feedback': '/feedback',
+};
+
+// Get initial view from URL
+const getViewFromPath = (): ViewState => {
+  const path = window.location.pathname;
+  // Check for exact match first
+  if (pathToView[path]) {
+    return pathToView[path];
+  }
+  // Default to dashboard
+  return 'dashboard';
+};
+
 // Inner app component that uses project context
 const AppContent: React.FC<{
   user: User;
@@ -31,9 +64,35 @@ const AppContent: React.FC<{
   resolvedTheme: 'light' | 'dark';
   onThemeModeChange: (mode: ThemeMode) => void;
 }> = ({ user, onLogout, themeMode, resolvedTheme, onThemeModeChange }) => {
-  const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [currentView, setCurrentView] = useState<ViewState>(getViewFromPath());
   const [showProjectModal, setShowProjectModal] = useState(false);
   const { activeProject, projectId, isLoading, userId } = useProject();
+
+  // Handle view change and update URL
+  const handleViewChange = (view: ViewState) => {
+    setCurrentView(view);
+    const newPath = viewToPath[view];
+    if (window.location.pathname !== newPath) {
+      window.history.pushState({ view }, '', newPath);
+    }
+  };
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const view = event.state?.view || getViewFromPath();
+      setCurrentView(view);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    // Set initial state in history
+    if (!window.history.state?.view) {
+      window.history.replaceState({ view: currentView }, '', viewToPath[currentView]);
+    }
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const renderView = () => {
     // Show "no project" state if no active project
@@ -122,7 +181,7 @@ const AppContent: React.FC<{
       <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
         <Sidebar 
           currentView={currentView} 
-          onChangeView={setCurrentView} 
+          onChangeView={handleViewChange} 
           user={user} 
           onLogout={onLogout}
           onOpenProjectModal={() => setShowProjectModal(true)}

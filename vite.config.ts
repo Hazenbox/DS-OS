@@ -8,9 +8,9 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 1899,
         host: '0.0.0.0',
-        // Enable history API fallback for SPA routing
-        historyApiFallback: true,
       },
+      // SPA fallback is enabled by default in Vite
+      appType: 'spa',
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
