@@ -1,9 +1,10 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
-// Get all components
+// Get all components for a project
 export const list = query({
   args: {
+    projectId: v.optional(v.id("projects")),
     status: v.optional(v.union(
       v.literal("draft"),
       v.literal("review"),
@@ -12,13 +13,23 @@ export const list = query({
     )),
   },
   handler: async (ctx, args) => {
+    if (!args.projectId) {
+      return [];
+    }
+    
     if (args.status) {
       return await ctx.db
         .query("components")
-        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .withIndex("by_project_status", (q) => 
+          q.eq("projectId", args.projectId!).eq("status", args.status!)
+        )
         .collect();
     }
-    return await ctx.db.query("components").collect();
+    
+    return await ctx.db
+      .query("components")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .collect();
   },
 });
 
@@ -33,6 +44,7 @@ export const get = query({
 // Create a new component
 export const create = mutation({
   args: {
+    projectId: v.id("projects"),
     name: v.string(),
     status: v.union(
       v.literal("draft"),
@@ -49,6 +61,7 @@ export const create = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      projectId: args.projectId,
       user: "Current User",
       action: "create",
       target: `Component: ${args.name}`,
@@ -82,7 +95,6 @@ export const update = mutation({
       throw new Error("Component not found");
     }
     
-    // Filter out undefined values
     const filteredUpdates = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
@@ -91,6 +103,7 @@ export const update = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      projectId: existing.projectId,
       user: "Current User",
       action: "update",
       target: `Component: ${existing.name}`,
@@ -115,6 +128,7 @@ export const remove = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      projectId: existing.projectId,
       user: "Current User",
       action: "delete",
       target: `Component: ${existing.name}`,
@@ -124,4 +138,3 @@ export const remove = mutation({
     return args.id;
   },
 });
-

@@ -3,6 +3,7 @@ import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { TokenType } from '../types';
 import { Upload, FileJson, Check, AlertCircle, X, Loader2, Figma } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
 interface FigmaImportProps {
     isOpen: boolean;
@@ -26,6 +27,7 @@ interface ParsedToken {
 }
 
 export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => {
+    const { projectId } = useProject();
     const [dragActive, setDragActive] = useState(false);
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -177,7 +179,7 @@ export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => 
     };
 
     const handleImport = async () => {
-        if (!preview) return;
+        if (!preview || !projectId) return;
         
         setImporting(true);
         setError(null);
@@ -191,6 +193,7 @@ export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => 
             }));
             
             await bulkImport({
+                projectId,
                 tokens: tokensToImport,
                 clearExisting: replaceExisting,
             });

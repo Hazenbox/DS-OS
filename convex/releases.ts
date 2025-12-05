@@ -1,21 +1,39 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
-// Get all releases
+// Get all releases for a project
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("releases").order("desc").collect();
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    if (!args.projectId) {
+      return [];
+    }
+    
+    return await ctx.db
+      .query("releases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .order("desc")
+      .collect();
   },
 });
 
-// Get the latest release
+// Get the latest release for a project
 export const latest = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    if (!args.projectId) {
+      return null;
+    }
+    
     const releases = await ctx.db
       .query("releases")
-      .withIndex("by_status", (q) => q.eq("status", "published"))
+      .withIndex("by_project_status", (q) => 
+        q.eq("projectId", args.projectId!).eq("status", "published")
+      )
       .order("desc")
       .first();
     return releases;
@@ -25,6 +43,7 @@ export const latest = query({
 // Create a new release
 export const create = mutation({
   args: {
+    projectId: v.id("projects"),
     version: v.string(),
     changelog: v.string(),
     components: v.array(v.string()),
@@ -37,6 +56,7 @@ export const create = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      projectId: args.projectId,
       user: "Current User",
       action: "create",
       target: `Release: ${args.version}`,
@@ -75,6 +95,7 @@ export const updateStatus = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      projectId: existing.projectId,
       user: "Current User",
       action: "release",
       target: `Release ${existing.version}: ${args.status}`,
@@ -84,4 +105,3 @@ export const updateStatus = mutation({
     return args.id;
   },
 });
-

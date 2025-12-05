@@ -1,9 +1,10 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
-// Get all activity logs, ordered by creation time (newest first)
+// Get all activity logs for a project, ordered by creation time (newest first)
 export const list = query({
   args: {
+    projectId: v.optional(v.id("projects")),
     limit: v.optional(v.number()),
     targetType: v.optional(v.union(
       v.literal("token"),
@@ -13,9 +14,15 @@ export const list = query({
     )),
   },
   handler: async (ctx, args) => {
-    let query = ctx.db.query("activity").order("desc");
+    if (!args.projectId) {
+      return [];
+    }
     
-    const activities = await query.collect();
+    const activities = await ctx.db
+      .query("activity")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .order("desc")
+      .collect();
     
     // Filter by targetType if specified
     let filtered = args.targetType 
@@ -34,6 +41,7 @@ export const list = query({
 // Create a new activity log entry
 export const create = mutation({
   args: {
+    projectId: v.optional(v.id("projects")),
     user: v.string(),
     action: v.union(
       v.literal("create"),
@@ -56,11 +64,18 @@ export const create = mutation({
   },
 });
 
-// Clear old activity logs (keep last N entries)
+// Clear old activity logs for a project (keep last N entries)
 export const cleanup = mutation({
-  args: { keepCount: v.number() },
+  args: { 
+    projectId: v.id("projects"),
+    keepCount: v.number() 
+  },
   handler: async (ctx, args) => {
-    const activities = await ctx.db.query("activity").order("desc").collect();
+    const activities = await ctx.db
+      .query("activity")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .order("desc")
+      .collect();
     
     if (activities.length > args.keepCount) {
       const toDelete = activities.slice(args.keepCount);
@@ -73,4 +88,3 @@ export const cleanup = mutation({
     return 0;
   },
 });
-

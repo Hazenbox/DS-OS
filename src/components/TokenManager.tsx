@@ -6,6 +6,7 @@ import { TokenType, ConvexToken, convexActivityToLegacy, convexTokenToLegacy } f
 import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Activity, X, Figma } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { FigmaImport } from './FigmaImport';
+import { useProject } from '../contexts/ProjectContext';
 
 const TABS: { id: TokenType; label: string }[] = [
     { id: 'color', label: 'Colors' },
@@ -17,6 +18,7 @@ const TABS: { id: TokenType; label: string }[] = [
 ];
 
 export const TokenManager: React.FC = () => {
+    const { projectId } = useProject();
     const [activeTab, setActiveTab] = useState<TokenType>('color');
     const [showActivity, setShowActivity] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -29,9 +31,9 @@ export const TokenManager: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Convex queries
-    const tokens = useQuery(api.tokens.list, {});
-    const activityLogs = useQuery(api.activity.list, { limit: 20, targetType: 'token' });
+    // Convex queries - scoped to project
+    const tokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
+    const activityLogs = useQuery(api.activity.list, projectId ? { projectId, limit: 20, targetType: 'token' } : "skip");
 
     // Convex mutations
     const createToken = useMutation(api.tokens.create);
@@ -67,10 +69,11 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleAddToken = async () => {
-        if (!newToken.name || !newToken.value) return;
+        if (!newToken.name || !newToken.value || !projectId) return;
         
         try {
             await createToken({
+                projectId,
                 name: newToken.name,
                 value: newToken.value,
                 type: activeTab,
@@ -85,7 +88,7 @@ export const TokenManager: React.FC = () => {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || !projectId) return;
 
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -94,6 +97,7 @@ export const TokenManager: React.FC = () => {
                 const parsedTokens = flattenTokens(json);
                 
                 await bulkImport({ 
+                    projectId,
                     tokens: parsedTokens,
                     clearExisting: false 
                 });
@@ -146,7 +150,7 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleDownload = async () => {
-        if (!tokens) return;
+        if (!tokens || !projectId) return;
         
         const exportObj = tokens.reduce((acc, token) => {
             if (!acc[token.type]) acc[token.type] = {};
@@ -163,6 +167,7 @@ export const TokenManager: React.FC = () => {
         downloadAnchorNode.remove();
         
         await logActivity({
+            projectId,
             user: 'Current User',
             action: 'download',
             target: 'Tokens exported',

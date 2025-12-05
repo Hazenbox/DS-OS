@@ -2,8 +2,9 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Design Tokens
+  // Design Tokens - scoped to project
   tokens: defineTable({
+    projectId: v.id("projects"),
     name: v.string(),
     value: v.string(),
     type: v.union(
@@ -17,12 +18,16 @@ export default defineSchema({
       v.literal("unknown")
     ),
     description: v.optional(v.string()),
-    brand: v.optional(v.string()), // For multi-brand support
-  }).index("by_type", ["type"])
+    brand: v.optional(v.string()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_type", ["projectId", "type"])
+    .index("by_type", ["type"])
     .index("by_brand", ["brand"]),
 
-  // Components
+  // Components - scoped to project
   components: defineTable({
+    projectId: v.id("projects"),
     name: v.string(),
     status: v.union(
       v.literal("draft"),
@@ -33,10 +38,14 @@ export default defineSchema({
     version: v.string(),
     code: v.string(),
     docs: v.string(),
-  }).index("by_status", ["status"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_status", ["status"]),
 
-  // Activity Log
+  // Activity Log - scoped to project
   activity: defineTable({
+    projectId: v.optional(v.id("projects")), // Optional for system-wide activity
     user: v.string(),
     action: v.union(
       v.literal("create"),
@@ -53,16 +62,19 @@ export default defineSchema({
       v.literal("release"),
       v.literal("system")
     ),
-  }).index("by_action", ["action"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_action", ["action"]),
 
-  // Settings (singleton-like, one document)
+  // Settings (global, user-level)
   settings: defineTable({
     key: v.string(),
     value: v.string(),
   }).index("by_key", ["key"]),
 
-  // Releases
+  // Releases - scoped to project
   releases: defineTable({
+    projectId: v.id("projects"),
     version: v.string(),
     status: v.union(
       v.literal("draft"),
@@ -72,14 +84,18 @@ export default defineSchema({
     ),
     changelog: v.string(),
     publishedAt: v.optional(v.number()),
-    components: v.array(v.string()), // Component IDs included in release
-  }).index("by_status", ["status"]),
+    components: v.array(v.string()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_status", ["status"]),
 
-  // Brands (for multi-brand token management)
+  // Brands - scoped to project
   brands: defineTable({
+    projectId: v.optional(v.id("projects")),
     name: v.string(),
     isDefault: v.boolean(),
-  }),
+  }).index("by_project", ["projectId"]),
 
   // Projects
   projects: defineTable({
@@ -88,7 +104,7 @@ export default defineSchema({
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    createdBy: v.optional(v.string()), // User email
+    createdBy: v.optional(v.string()),
   }).index("by_active", ["isActive"]),
 
   // Users
@@ -96,14 +112,14 @@ export default defineSchema({
     email: v.string(),
     emailVerified: v.boolean(),
     name: v.optional(v.string()),
-    image: v.optional(v.string()), // Profile picture from OAuth
+    image: v.optional(v.string()),
     role: v.union(v.literal("admin"), v.literal("user")),
     provider: v.optional(v.union(
       v.literal("email"),
       v.literal("google"),
       v.literal("github")
     )),
-    providerId: v.optional(v.string()), // OAuth provider's user ID
+    providerId: v.optional(v.string()),
     createdAt: v.number(),
     lastLoginAt: v.optional(v.number()),
   })

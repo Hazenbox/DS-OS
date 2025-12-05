@@ -2,20 +2,17 @@ import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
-import { Token, ConvexComponent } from '../types';
+import { Token, ConvexComponent, convexTokenToLegacy } from '../types';
 import { generateComponentCode, generateDocumentation } from '../services/geminiService';
 import { Send, Zap, Code, FileText, Loader2, Trash2, Play, Eye, EyeOff, Copy, Check, Figma } from 'lucide-react';
 import { FigmaComponentGenerator } from './FigmaComponentGenerator';
+import { useProject } from '../contexts/ProjectContext';
 import Editor from '@monaco-editor/react';
 import { 
   SandpackProvider, 
   SandpackPreview,
   useSandpack
 } from '@codesandbox/sandpack-react';
-
-interface BuilderProps {
-    tokens: Token[];
-}
 
 // Custom preview component that handles errors gracefully
 const PreviewPane: React.FC<{ code: string; tokens: Token[] }> = ({ code, tokens }) => {
@@ -71,18 +68,23 @@ root.render(<Component />);
     );
 };
 
-export const ComponentBuilder: React.FC<BuilderProps> = ({ tokens }) => {
+export const ComponentBuilder: React.FC = () => {
+    const { projectId } = useProject();
     const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
     const [prompt, setPrompt] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'docs'>('code');
     const [showPreview, setShowPreview] = useState(true);
     const [copied, setCopied] = useState(false);
+    
+    // Fetch tokens for this project
+    const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
+    const tokens = (convexTokens || []).map(convexTokenToLegacy);
     const [localCode, setLocalCode] = useState<string | null>(null);
     const [showFigmaGenerator, setShowFigmaGenerator] = useState(false);
 
-    // Convex queries
-    const components = useQuery(api.components.list, {});
+    // Convex queries - scoped to project
+    const components = useQuery(api.components.list, projectId ? { projectId } : "skip");
 
     // Convex mutations
     const createComponent = useMutation(api.components.create);
@@ -95,8 +97,10 @@ export const ComponentBuilder: React.FC<BuilderProps> = ({ tokens }) => {
     const displayCode = localCode ?? selectedComponent?.code ?? '';
 
     const handleCreateNew = async () => {
+        if (!projectId) return;
         try {
             const newId = await createComponent({
+                projectId,
                 name: 'New Component',
                 status: 'draft',
                 version: '0.0.1',

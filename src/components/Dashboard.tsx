@@ -1,13 +1,9 @@
 import React from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { ComponentItem, TokenActivity } from '../types';
+import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
 import { CheckCircle, GitBranch, Package, Palette } from 'lucide-react';
-
-interface DashboardProps {
-    components: ComponentItem[];
-    activity?: TokenActivity[];
-}
+import { useProject } from '../contexts/ProjectContext';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; delta?: string }> = ({ title, value, icon, delta }) => (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 p-4 rounded-lg">
@@ -20,23 +16,29 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
     </div>
 );
 
-export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] }) => {
-  // Get real data from Convex
-  const tokens = useQuery(api.tokens.list, {});
-  const latestRelease = useQuery(api.releases.latest, {});
+export const Dashboard: React.FC = () => {
+  const { projectId } = useProject();
+  
+  // Get real data from Convex - scoped to project
+  const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
+  const convexComponents = useQuery(api.components.list, projectId ? { projectId } : "skip");
+  const convexActivity = useQuery(api.activity.list, projectId ? { projectId, limit: 50 } : "skip");
+  const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
+
+  const tokens = convexTokens || [];
+  const components = (convexComponents || []).map(convexComponentToLegacy);
+  const activity = (convexActivity || []).map(convexActivityToLegacy);
 
   // Calculate stats
   const stableCount = components.filter(c => c.status === 'stable').length;
-  const adoptionRate = components.length > 0 
-    ? Math.round((stableCount / components.length) * 100) 
-    : 0;
+  const reviewCount = components.filter(c => c.status === 'review').length;
 
   // Get recent activity (last 5)
   const recentActivity = activity.slice(0, 5);
   
   // Get current version
   const currentVersion = latestRelease?.version || '—';
-  const tokenCount = tokens?.length || 0;
+  const tokenCount = tokens.length;
 
   return (
     <div className="flex flex-col h-full">
@@ -66,7 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                     />
                     <StatCard 
                         title="In Review" 
-                        value={components.filter(c => c.status === 'review').length.toString()} 
+                        value={reviewCount.toString()} 
                         icon={<CheckCircle size={16}/>} 
                     />
                     <StatCard 
@@ -76,25 +78,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ components, activity = [] 
                     />
                 </div>
 
-                    <div className="space-y-4">
+                <div className="space-y-4">
                     <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Recent Activity</h3>
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-4">
-                            {recentActivity.length === 0 ? (
+                        {recentActivity.length === 0 ? (
                             <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-8">No recent activity</p>
-                            ) : (
-                                <ul className="space-y-4">
-                                    {recentActivity.map((act) => (
-                                        <li key={act.id} className="flex gap-2 text-sm">
+                        ) : (
+                            <ul className="space-y-4">
+                                {recentActivity.map((act) => (
+                                    <li key={act.id} className="flex gap-2 text-sm">
                                         <span className="font-semibold text-zinc-900 dark:text-white">{act.user}</span>
                                         <span className="text-zinc-500 dark:text-zinc-400">{act.action}</span>
                                         <span className="text-violet-600 dark:text-violet-400 font-mono truncate">{act.target}</span>
                                         <span className="text-zinc-500 dark:text-zinc-400 ml-auto whitespace-nowrap">
-                                                {new Date(act.timestamp).toLocaleTimeString()}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                                            {new Date(act.timestamp).toLocaleTimeString()}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
 

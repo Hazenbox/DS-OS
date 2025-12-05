@@ -1,6 +1,61 @@
+import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 
-// Clear all data from the database
+// Clear all data for a specific project
+export const clearProjectData = mutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    // Clear tokens for this project
+    const tokens = await ctx.db
+      .query("tokens")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const token of tokens) {
+      await ctx.db.delete(token._id);
+    }
+    
+    // Clear components for this project
+    const components = await ctx.db
+      .query("components")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const component of components) {
+      await ctx.db.delete(component._id);
+    }
+    
+    // Clear activity for this project
+    const activity = await ctx.db
+      .query("activity")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const act of activity) {
+      await ctx.db.delete(act._id);
+    }
+    
+    // Clear releases for this project
+    const releases = await ctx.db
+      .query("releases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const release of releases) {
+      await ctx.db.delete(release._id);
+    }
+    
+    return { 
+      message: "Project data cleared",
+      deleted: {
+        tokens: tokens.length,
+        components: components.length,
+        activity: activity.length,
+        releases: releases.length,
+      }
+    };
+  },
+});
+
+// Clear all data (legacy - clears everything)
 export const clearAllData = mutation({
   args: {},
   handler: async (ctx) => {

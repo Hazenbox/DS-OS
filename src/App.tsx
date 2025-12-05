@@ -10,8 +10,9 @@ import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
-import { ViewState, convexTokenToLegacy, convexComponentToLegacy, convexActivityToLegacy } from './types';
-import { BookOpen, MessageSquare, Loader2 } from 'lucide-react';
+import { ProjectProvider, useProject } from './contexts/ProjectContext';
+import { ViewState } from './types';
+import { BookOpen, MessageSquare, Loader2, FolderOpen } from 'lucide-react';
 
 interface User {
   userId: string;
@@ -23,11 +24,106 @@ interface User {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-const App: React.FC = () => {
+// Inner app component that uses project context
+const AppContent: React.FC<{
+  user: User;
+  onLogout: () => void;
+  themeMode: ThemeMode;
+  resolvedTheme: 'light' | 'dark';
+  onThemeModeChange: (mode: ThemeMode) => void;
+}> = ({ user, onLogout, themeMode, resolvedTheme, onThemeModeChange }) => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const { activeProject, projectId, isLoading } = useProject();
+
+  const renderView = () => {
+    // Show "no project" state if no active project
+    if (!projectId && !isLoading) {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div>
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
+                {currentView === 'settings' ? 'Settings' : 'No Project Selected'}
+              </h2>
+            </div>
+          </div>
+          {currentView === 'settings' ? (
+            <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
+              <FolderOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Create a Project</h2>
+              <p className="max-w-md text-center text-sm">
+                Select or create a project from the dropdown in the sidebar to get started.
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'tokens':
+        return <TokenManager />;
+      case 'builder':
+        return <ComponentBuilder />;
+      case 'releases':
+        return <ReleaseManager />;
+      case 'settings':
+        return <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />;
+      case 'documentation':
+        return (
+          <div className="flex flex-col h-full">
+            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+                <div>
+                    <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Documentation</h2>
+                </div>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
+              <BookOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Docusaurus Integration</h2>
+              <p className="max-w-md text-center text-sm">Documentation is auto-generated and hosted on Docusaurus. <br/> <a href="#" className="text-violet-600 dark:text-violet-400 hover:underline">View Live Site</a></p>
+            </div>
+          </div>
+        );
+      case 'feedback':
+        return (
+            <div className="flex flex-col h-full">
+                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+                    <div>
+                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Feedback</h2>
+                    </div>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
+                  <MessageSquare size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+                  <h2 className="text-lg font-medium text-zinc-900 dark:text-white">No New Feedback</h2>
+                  <p className="text-sm">No new tickets from Storybook or Docs integration.</p>
+                </div>
+            </div>
+          );
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user} onLogout={onLogout} />
+      
+      <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
+        <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
+          {renderView()}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   
   // Authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -105,29 +201,6 @@ const App: React.FC = () => {
     }
   }, [isOAuthCallback]);
 
-  // Convex queries
-  const convexTokens = useQuery(api.tokens.list, {});
-  const convexComponents = useQuery(api.components.list, {});
-  const convexActivity = useQuery(api.activity.list, { limit: 50 });
-
-  // Check backend availability with timeout
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (convexTokens === undefined && convexComponents === undefined) {
-        setBackendAvailable(false);
-      } else {
-        setBackendAvailable(true);
-      }
-    }, 3000); // Wait 3 seconds before assuming backend is unavailable
-
-    return () => clearTimeout(timer);
-  }, [convexTokens, convexComponents]);
-
-  // Convert to legacy format for backward compatibility
-  const tokens = convexTokens?.map(convexTokenToLegacy) || [];
-  const components = convexComponents?.map(convexComponentToLegacy) || [];
-  const activity = convexActivity?.map(convexActivityToLegacy) || [];
-
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     localStorage.setItem('themeMode', mode);
@@ -140,10 +213,8 @@ const App: React.FC = () => {
   };
 
   const handleSignupSuccess = (userData: User) => {
-    // Email is auto-verified, so directly log the user in
     setUser(userData);
     setAuthView(null);
-    // Store user in localStorage
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
@@ -166,92 +237,16 @@ const App: React.FC = () => {
     return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignup={() => setAuthView('signup')} />;
   }
 
-  // Loading state - but allow fallback if backend is unavailable
-  if (convexTokens === undefined || convexComponents === undefined) {
-    if (backendAvailable === false) {
-      // Backend is confirmed unavailable, show warning but continue
-      return (
-        <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Backend unavailable - using offline mode</p>
-          </div>
-        </div>
-      );
-    }
-    // Still loading, show loading state
-    return (
-      <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Connecting to database...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const renderView = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard components={components} activity={activity} />;
-      case 'tokens':
-        return <TokenManager />;
-      case 'builder':
-        return <ComponentBuilder tokens={tokens} />;
-      case 'releases':
-        return <ReleaseManager components={components} />;
-      case 'settings':
-        return <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={handleThemeModeChange} />;
-      case 'documentation':
-        return (
-          <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
-                <div>
-                    <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Documentation</h2>
-                </div>
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
-              <BookOpen size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Docusaurus Integration</h2>
-              <p className="max-w-md text-center text-sm">Documentation is auto-generated and hosted on Docusaurus. <br/> <a href="#" className="text-violet-600 dark:text-violet-400 hover:underline">View Live Site</a></p>
-            </div>
-          </div>
-        );
-      case 'feedback':
-        return (
-            <div className="flex flex-col h-full">
-                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
-                    <div>
-                        <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Feedback</h2>
-                    </div>
-                </div>
-                <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-4">
-                  <MessageSquare size={48} className="text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
-                  <h2 className="text-lg font-medium text-zinc-900 dark:text-white">No New Feedback</h2>
-                  <p className="text-sm">No new tickets from Storybook or Docs integration.</p>
-                </div>
-            </div>
-          );
-      default:
-        return <Dashboard components={components} activity={activity} />;
-    }
-  };
-
   return (
-    <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user} onLogout={handleLogout} />
-      
-      <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
-        {backendAvailable === false && (
-          <div className="mb-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-600 dark:text-yellow-400">
-            ⚠️ Backend unavailable - Running in offline mode. Data changes will not be persisted.
-          </div>
-        )}
-        <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
-          {renderView()}
-        </main>
-      </div>
-    </div>
+    <ProjectProvider>
+      <AppContent 
+        user={user} 
+        onLogout={handleLogout}
+        themeMode={themeMode}
+        resolvedTheme={resolvedTheme}
+        onThemeModeChange={handleThemeModeChange}
+      />
+    </ProjectProvider>
   );
 };
 

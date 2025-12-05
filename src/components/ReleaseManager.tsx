@@ -1,28 +1,30 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { ComponentItem, DeploymentStatus } from '../types';
+import { DeploymentStatus, convexComponentToLegacy } from '../types';
 import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
-interface ReleaseManagerProps {
-    components: ComponentItem[];
-}
-
-export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) => {
+export const ReleaseManager: React.FC = () => {
+    const { projectId } = useProject();
     const [activeDeploy, setActiveDeploy] = useState<DeploymentStatus[] | null>(null);
 
-    // Convex queries
-    const releases = useQuery(api.releases.list, {});
-    const latestRelease = useQuery(api.releases.latest, {});
+    // Convex queries - scoped to project
+    const convexComponents = useQuery(api.components.list, projectId ? { projectId } : "skip");
+    const releases = useQuery(api.releases.list, projectId ? { projectId } : "skip");
+    const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
 
     // Convex mutations
     const createRelease = useMutation(api.releases.create);
     const updateReleaseStatus = useMutation(api.releases.updateStatus);
     const logActivity = useMutation(api.activity.create);
 
+    const components = (convexComponents || []).map(convexComponentToLegacy);
     const pendingComponents = components.filter(c => c.status !== 'stable' && c.status !== 'deprecated');
 
     const startRelease = async () => {
+        if (!projectId) return;
+        
         const steps: DeploymentStatus['step'][] = ['lint', 'test', 'build', 'docs', 'publish'];
         const initialStatus: DeploymentStatus[] = steps.map(s => ({ step: s, status: 'pending' }));
         setActiveDeploy(initialStatus);
@@ -35,8 +37,9 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
         // Create release record
         try {
             const releaseId = await createRelease({
+                projectId,
                 version: newVersion,
-                changelog: generateChangelog(components),
+                changelog: generateChangelog(),
                 components: components.map(c => c.id),
             });
 
@@ -74,10 +77,10 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
         }
     };
 
-    const generateChangelog = (comps: ComponentItem[]) => {
-        const stable = comps.filter(c => c.status === 'stable');
-        const review = comps.filter(c => c.status === 'review');
-        const draft = comps.filter(c => c.status === 'draft');
+    const generateChangelog = () => {
+        const stable = components.filter(c => c.status === 'stable');
+        const review = components.filter(c => c.status === 'review');
+        const draft = components.filter(c => c.status === 'draft');
         
         let changelog = '## Changes\n\n';
         
@@ -111,8 +114,8 @@ export const ReleaseManager: React.FC<ReleaseManagerProps> = ({ components }) =>
         switch (status) {
             case 'success': return <CheckCircle className="text-green-500" size={18} />;
             case 'failed': return <AlertCircle className="text-red-500" size={18} />;
-            case 'running': return <Loader2 className="animate-spin text-accent" size={18} />;
-            default: return <Circle className="text-muted" size={18} />;
+            case 'running': return <Loader2 className="animate-spin text-violet-500" size={18} />;
+            default: return <Circle className="text-zinc-400" size={18} />;
         }
     };
 
