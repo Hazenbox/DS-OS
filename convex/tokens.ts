@@ -23,6 +23,7 @@ async function verifyProjectAccess(
 // ============================================================================
 
 // Get all tokens for a project, optionally filtered by type
+// Only returns tokens from active files (or manually added tokens without a source file)
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
@@ -33,19 +34,35 @@ export const list = query({
       return [];
     }
     
+    // Get all inactive file IDs for this project
+    const inactiveFiles = await ctx.db
+      .query("tokenFiles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .filter((q) => q.eq(q.field("isActive"), false))
+      .collect();
+    
+    const inactiveFileIds = new Set(inactiveFiles.map(f => f._id.toString()));
+    
+    let tokens;
     if (args.type) {
-      return await ctx.db
+      tokens = await ctx.db
         .query("tokens")
         .withIndex("by_project_type", (q) => 
           q.eq("projectId", args.projectId!).eq("type", args.type as any)
         )
         .collect();
+    } else {
+      tokens = await ctx.db
+        .query("tokens")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+        .collect();
     }
     
-    return await ctx.db
-      .query("tokens")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
-      .collect();
+    // Filter out tokens from inactive files
+    return tokens.filter(token => {
+      if (!token.sourceFileId) return true; // Manually added tokens always shown
+      return !inactiveFileIds.has(token.sourceFileId.toString());
+    });
   },
 });
 
