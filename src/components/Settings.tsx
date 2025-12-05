@@ -134,7 +134,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                         <div className="flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center flex-shrink-0">
                                 {getThemeIcon()}
-                            </div>
+                                </div>
                             <div className="flex-1">
                                 <h3 className="font-medium text-zinc-900 dark:text-white mb-1">Appearance</h3>
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
@@ -367,9 +367,9 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                 onClick={() => setShowClearConfirm(true)}
                                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-transparent border border-red-300 dark:border-red-500/30 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10"
                             >
-                                <Trash2 size={14} />
-                                Clear All Data
-                            </button>
+                            <Trash2 size={14} />
+                            Clear All Data
+                        </button>
                         ) : (
                             <div className="space-y-3">
                                 <p className="text-sm text-red-600 dark:text-red-400 font-medium">

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexActivityToLegacy, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Moon, Layers, ChevronDown, Activity, X, Figma } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, History, LayoutGrid, List as ListIcon, Activity, X, Figma } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { FigmaImport } from './FigmaImport';
 
@@ -22,8 +22,6 @@ export const TokenManager: React.FC = () => {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
-    const [density, setDensity] = useState<'1x' | '2x' | '3x'>('1x');
-    const [isDarkModePreview, setIsDarkModePreview] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [showFigmaImport, setShowFigmaImport] = useState(false);
@@ -173,18 +171,10 @@ export const TokenManager: React.FC = () => {
     };
 
     const getPreviewStyle = (token: ConvexToken) => {
-        let scale = 1;
-        if (density === '2x') scale = 1.5;
-        if (density === '3x') scale = 2;
-
         if (token.type === 'color') return { backgroundColor: token.value };
         if (token.type === 'radius') return { borderRadius: token.value };
         if (token.type === 'shadow') return { boxShadow: token.value };
         if (token.type === 'spacing' || token.type === 'sizing') {
-            const val = token.value;
-            if (val.endsWith('rem') || val.endsWith('px')) {
-                 return { width: `calc(${val} * ${scale})` };
-            }
             return { width: token.value };
         }
         if (token.type === 'typography') return { fontSize: token.value };
@@ -193,27 +183,26 @@ export const TokenManager: React.FC = () => {
 
     const renderPreview = (token: ConvexToken) => {
         const style = getPreviewStyle(token);
-        const containerClass = isDarkModePreview ? 'bg-[#18181b] border-[#27272a]' : 'bg-surface border-border';
 
         if (token.type === 'color') {
-            return <div className={`w-8 h-8 rounded border border-border shadow-sm`} style={style} />;
+            return <div className="w-8 h-8 rounded border border-zinc-200/60 dark:border-zinc-700/60 shadow-sm" style={style} />;
         }
         if (token.type === 'radius') {
-            return <div className={`w-8 h-8 border border-primary ${containerClass}`} style={style} />;
+            return <div className="w-8 h-8 border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800" style={style} />;
         }
         if (token.type === 'spacing' || token.type === 'sizing') {
              return (
-                 <div className="h-4 bg-accent/20 border border-accent/50 rounded flex items-center justify-center text-[10px] text-accent min-w-[20px]" style={style}>
+                 <div className="h-4 bg-violet-500/20 border border-violet-500/50 rounded flex items-center justify-center text-[10px] text-violet-600 dark:text-violet-400 min-w-[20px]" style={style}>
                  </div>
              );
         }
         if (token.type === 'shadow') {
-            return <div className={`w-8 h-8 rounded ${containerClass}`} style={style} />;
+            return <div className="w-8 h-8 rounded bg-white dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60" style={style} />;
         }
         if (token.type === 'typography') {
-            return <div className={`text-primary truncate ${containerClass} p-1 rounded`} style={style}>Ag</div>;
+            return <div className="text-zinc-900 dark:text-white truncate bg-zinc-100 dark:bg-zinc-800 p-1 rounded" style={style}>Ag</div>;
         }
-        return <div className="w-8 h-8 bg-surface border border-border flex items-center justify-center text-[10px] text-muted">?</div>;
+        return <div className="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-center text-[10px] text-zinc-500">?</div>;
     };
 
     return (
@@ -223,7 +212,7 @@ export const TokenManager: React.FC = () => {
                     <div>
                         <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Tokens</h2>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                          <input 
                             type="file" 
                             accept=".json" 
@@ -231,77 +220,63 @@ export const TokenManager: React.FC = () => {
                             className="hidden" 
                             onChange={handleFileUpload} 
                         />
+                        
+                        {/* Figma Import */}
                         <button 
                             onClick={() => setShowFigmaImport(true)}
+                            title="Import Figma Variables"
                             className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 rounded hover:bg-zinc-800 dark:hover:bg-zinc-600"
                         >
-                            <Figma size={14} /> Figma Variables
+                            <Figma size={14} /> Figma
                         </button>
+                        
+                        {/* Import JSON */}
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            title="Import JSON"
+                            className="p-1.5 text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
                         >
-                            <Upload size={14} /> Import JSON
+                            <Upload size={16} />
                         </button>
+                        
+                        {/* Export */}
                         <button 
                             onClick={() => setShowExportModal(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            title="Export Tokens"
+                            className="p-1.5 text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
                         >
-                            <Download size={14} /> Export
+                            <Download size={16} />
                         </button>
-                         <button 
+                        
+                        {/* Activity */}
+                        <button 
                             onClick={() => setShowActivity(!showActivity)}
-                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium border rounded ${showActivity ? 'bg-violet-600 text-white border-transparent' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-700/60 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                            title="Activity Log"
+                            className={`p-1.5 border rounded ${showActivity ? 'bg-violet-600 text-white border-transparent' : 'text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border-zinc-200/60 dark:border-zinc-700/60 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white'}`}
                         >
-                            <History size={14} /> Activity
+                            <History size={16} />
                         </button>
-                    </div>
-                </div>
-
-                {/* Toolbar */}
-                <div className="px-6 py-3 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        {/* Density Selector */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium uppercase">Density</span>
-                            <div className="relative">
-                                <select 
-                                    className="appearance-none bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded px-3 py-1 pr-8 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
-                                    value={density}
-                                    onChange={(e) => setDensity(e.target.value as any)}
-                                >
-                                    <option value="1x">1x (Default)</option>
-                                    <option value="2x">2x (Compact)</option>
-                                    <option value="3x">3x (Dense)</option>
-                                </select>
-                                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-                            </div>
+                        
+                        {/* Divider */}
+                        <div className="w-px h-6 bg-zinc-200/60 dark:bg-zinc-700/60 mx-1" />
+                        
+                        {/* View Toggle */}
+                        <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded p-0.5 border border-zinc-200/60 dark:border-zinc-700/60">
+                            <button 
+                                onClick={() => setViewMode('grid')}
+                                title="Grid View"
+                                className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                            >
+                                <LayoutGrid size={14} />
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('list')}
+                                title="List View"
+                                className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
+                            >
+                                <ListIcon size={14} />
+                            </button>
                         </div>
-
-                        {/* Dark Mode Toggle for Preview */}
-                        <button 
-                             onClick={() => setIsDarkModePreview(!isDarkModePreview)}
-                             className={`flex items-center gap-2 px-3 py-1 rounded text-xs border ${isDarkModePreview ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-700/60'}`}
-                        >
-                            {isDarkModePreview ? <Moon size={12} /> : <Layers size={12} />}
-                            {isDarkModePreview ? 'Dark Preview' : 'Light Preview'}
-                        </button>
-                    </div>
-
-                    {/* View Toggle */}
-                    <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded p-0.5 border border-zinc-200/60 dark:border-zinc-700/60">
-                        <button 
-                            onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                        >
-                            <LayoutGrid size={14} />
-                        </button>
-                        <button 
-                            onClick={() => setViewMode('list')}
-                            className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
-                        >
-                            <ListIcon size={14} />
-                        </button>
                     </div>
                 </div>
 
