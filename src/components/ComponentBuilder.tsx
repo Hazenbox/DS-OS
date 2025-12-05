@@ -38,56 +38,178 @@ interface ExtractionResult {
 }
 
 // ============================================================================
-// PREVIEW COMPONENT
+// PREVIEW COMPONENT - Uses iframe with inline styles for reliability
 // ============================================================================
 
 const ComponentPreview: React.FC<{ 
   code: string; 
   css: string;
   tokens: Token[];
-}> = ({ code, css, tokens }) => {
-  const cssVariables = tokens.map(t => `  --${t.name}: ${t.value};`).join('\n');
+  componentName?: string;
+}> = ({ code, css, tokens, componentName = 'Component' }) => {
+  const [previewMode, setPreviewMode] = useState<'sandbox' | 'static'>('static');
+  const [error, setError] = useState<string | null>(null);
   
-  const files = {
-    '/App.tsx': code,
-    '/component.css': css,
-    '/styles.css': `:root {\n${cssVariables}\n}\n\n* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n  padding: 20px;\n  background: #f5f5f5;\n  min-height: 100vh;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}`,
-    '/index.tsx': `import React from 'react';
-import { createRoot } from 'react-dom/client';
+  // Extract CSS properties from the generated code/css for a static preview
+  const extractedStyles = React.useMemo(() => {
+    // Try to extract inline styles from CSS
+    const styleMatch = css.match(/\{([^}]+)\}/);
+    if (styleMatch) {
+      return styleMatch[1]
+        .split(';')
+        .filter(s => s.trim())
+        .map(s => s.trim())
+        .join('; ');
+    }
+    return '';
+  }, [css]);
+  
+  // Static preview using iframe with injected HTML/CSS
+  const staticPreviewHtml = React.useMemo(() => {
+    const cssVariables = tokens.map(t => `  --${t.name}: ${t.value};`).join('\n');
+    
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    :root {
+      ${cssVariables}
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .preview-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    ${css}
+  </style>
+</head>
+<body>
+  <div class="preview-label">${componentName} Preview</div>
+  <div class="component-preview" style="${extractedStyles}">
+    <span>Button</span>
+  </div>
+</body>
+</html>`;
+  }, [css, tokens, componentName, extractedStyles]);
+
+  // Sandpack files for interactive preview
+  const sandpackFiles = React.useMemo(() => {
+    const cssVariables = tokens.map(t => `  --${t.name}: ${t.value};`).join('\n');
+    
+    // Wrap the component code in a simple App that renders it
+    const wrappedCode = `import React from 'react';
 import './styles.css';
 
-let Component;
-try {
-  const mod = require('./App.tsx');
-  Component = mod.default || mod[Object.keys(mod)[0]] || (() => <div>No component exported</div>);
-} catch (e) {
-  Component = () => <div style={{ color: 'red', padding: 20 }}>Error loading component</div>;
-}
+// Generated Component
+${code}
 
-const root = createRoot(document.getElementById('root')!);
-root.render(<Component />);
-`,
-  };
+// Preview wrapper
+export default function App() {
+  return (
+    <div style={{ padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+      <span style={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        ${componentName} Preview
+      </span>
+      <${componentName}>Button</${componentName}>
+    </div>
+  );
+}
+`;
+
+    return {
+      '/App.tsx': wrappedCode,
+      '/styles.css': `:root {\n${cssVariables}\n}\n\n* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n}\n\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n  background: #f5f5f5;\n  min-height: 100vh;\n}\n\n${css}`,
+    };
+  }, [code, css, tokens, componentName]);
 
   return (
-    <SandpackProvider
-      template="react-ts"
-      files={files}
-      theme="dark"
-      options={{
-        classes: {
-          'sp-wrapper': 'h-full',
-          'sp-preview': 'h-full',
-          'sp-preview-container': 'h-full',
-        },
-      }}
-    >
-      <SandpackPreview 
-        showNavigator={false}
-        showRefreshButton={true}
-        style={{ height: '100%' }}
-      />
-    </SandpackProvider>
+    <div className="h-full flex flex-col">
+      {/* Preview Mode Toggle */}
+      <div className="flex items-center justify-between px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Preview</span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setPreviewMode('static')}
+            className={`px-2 py-1 text-[10px] rounded ${
+              previewMode === 'static' 
+                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            Static
+          </button>
+          <button
+            onClick={() => setPreviewMode('sandbox')}
+            className={`px-2 py-1 text-[10px] rounded ${
+              previewMode === 'sandbox' 
+                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            Interactive
+          </button>
+        </div>
+      </div>
+      
+      {/* Preview Content */}
+      <div className="flex-1 relative">
+        {previewMode === 'static' ? (
+          <iframe
+            srcDoc={staticPreviewHtml}
+            className="w-full h-full border-0 bg-white"
+            title="Component Preview"
+            sandbox="allow-scripts"
+          />
+        ) : (
+          <SandpackProvider
+            template="react-ts"
+            files={sandpackFiles}
+            theme="dark"
+            options={{
+              classes: {
+                'sp-wrapper': 'h-full',
+                'sp-preview': 'h-full',
+                'sp-preview-container': 'h-full',
+              },
+              recompileMode: 'delayed',
+              recompileDelay: 1000,
+            }}
+          >
+            <SandpackPreview 
+              showNavigator={false}
+              showRefreshButton={true}
+              style={{ height: '100%' }}
+            />
+          </SandpackProvider>
+        )}
+        
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-900/20">
+            <div className="text-center p-4">
+              <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -634,6 +756,7 @@ export const ComponentBuilder: React.FC = () => {
                       code={extractedResult.code}
                       css={extractedResult.css}
                       tokens={tokens}
+                      componentName={extractedResult.name}
                     />
                   </div>
                 </div>
