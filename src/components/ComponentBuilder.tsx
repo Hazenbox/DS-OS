@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { Token, convexTokenToLegacy } from '../types';
@@ -7,7 +7,8 @@ import {
   Link2, Loader2, Trash2, Eye, Code, Layers, 
   Settings2, MessageSquare, Check, X, 
   Palette, Type, Box, Maximize2, Circle, Sparkles,
-  AlertTriangle, Copy, Figma, Zap, ExternalLink
+  AlertTriangle, Copy, Figma, Zap, ExternalLink, 
+  AlertCircle, RefreshCw
 } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -27,7 +28,7 @@ interface ExtractedVariant {
 }
 
 interface ExtractionResult {
-  componentName: string;
+  name: string;
   description?: string;
   code: string;
   css: string;
@@ -106,6 +107,9 @@ const VariantSelector: React.FC<{
       <div className="flex items-center gap-2 mb-3">
         <Layers size={14} className="text-zinc-400" />
         <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Variants</span>
+        <span className="text-[10px] bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded-full">
+          {variants.length}
+        </span>
       </div>
       <div className="flex flex-wrap gap-2">
         {variants.map((variant, idx) => {
@@ -269,84 +273,49 @@ const FeedbackPanel: React.FC<{
 };
 
 // ============================================================================
-// EXTRACTION STATUS COMPONENT
+// API KEY SETUP PROMPT
 // ============================================================================
 
-const ExtractionStatus: React.FC<{
-  status: 'idle' | 'pending' | 'extracting' | 'completed' | 'failed';
-  figmaUrl: string;
-  onCancel: () => void;
-}> = ({ status, figmaUrl, onCancel }) => {
-  if (status === 'idle') return null;
-  
+const ApiKeySetup: React.FC<{
+  hasFigmaPat: boolean;
+  hasClaudeKey: boolean;
+}> = ({ hasFigmaPat, hasClaudeKey }) => {
   return (
-    <div className="absolute inset-0 bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center z-20">
-      <div className="text-center max-w-md px-6">
-        {status === 'pending' && (
-          <>
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-4">
-              <Figma size={28} className="text-violet-500" />
+    <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg mb-4">
+      <div className="flex gap-3">
+        <AlertCircle size={18} className="text-amber-500 flex-shrink-0" />
+        <div>
+          <h4 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+            API Keys Required
+          </h4>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs">
+              {hasFigmaPat ? (
+                <Check size={12} className="text-green-500" />
+              ) : (
+                <X size={12} className="text-red-500" />
+              )}
+              <span className={hasFigmaPat ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}>
+                Figma Personal Access Token
+              </span>
             </div>
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Ready to Extract
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-              Ask the AI to extract this component from Figma:
+            <div className="flex items-center gap-2 text-xs">
+              {hasClaudeKey ? (
+                <Check size={12} className="text-green-500" />
+              ) : (
+                <X size={12} className="text-red-500" />
+              )}
+              <span className={hasClaudeKey ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}>
+                Claude API Key
+              </span>
+            </div>
+          </div>
+          {(!hasFigmaPat || !hasClaudeKey) && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
+              Go to <span className="font-medium">Settings</span> to configure your API keys.
             </p>
-            <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg p-3 mb-4">
-              <p className="text-xs text-zinc-600 dark:text-zinc-300 font-mono break-all">
-                "Extract the component from: {figmaUrl}"
-              </p>
-            </div>
-            <p className="text-xs text-zinc-400 mb-4">
-              Or select a node in Figma desktop and say "Extract the selected Figma component"
-            </p>
-            <button
-              onClick={onCancel}
-              className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-            >
-              Cancel
-            </button>
-          </>
-        )}
-        
-        {status === 'extracting' && (
-          <>
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
-              <Zap size={28} className="text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Extracting from Figma...
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Analyzing design properties, variables, and generating code
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <Loader2 size={16} className="animate-spin text-violet-500" />
-              <span className="text-xs text-zinc-400">This may take a moment</span>
-            </div>
-          </>
-        )}
-        
-        {status === 'failed' && (
-          <>
-            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={28} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Extraction Failed
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-              Please make sure Figma desktop is open with the file loaded.
-            </p>
-            <button
-              onClick={onCancel}
-              className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-            >
-              Try Again
-            </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -361,87 +330,57 @@ export const ComponentBuilder: React.FC = () => {
   
   // State
   const [figmaUrl, setFigmaUrl] = useState('');
-  const [extractionStatus, setExtractionStatus] = useState<'idle' | 'pending' | 'extracting' | 'completed' | 'failed'>('idle');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<ExtractionResult | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ExtractedVariant | null>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect'>('preview');
   const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
   const [isRefining, setIsRefining] = useState(false);
-  const [pendingRequestId, setPendingRequestId] = useState<Id<"figmaExtractions"> | null>(null);
   
   // Convex queries
   const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
   const tokens = (convexTokens || []).map(convexTokenToLegacy);
   const components = useQuery(api.components.list, projectId ? { projectId } : "skip");
-  const extractionRequest = useQuery(
-    api.figmaExtraction.getExtractionRequest, 
-    pendingRequestId ? { requestId: pendingRequestId } : "skip"
-  );
+  const apiKeyStatus = useQuery(api.settings.get, userId ? { userId, key: 'claudeApiKey' } : "skip");
+  const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
   
   const isLoading = components === undefined && projectId;
+  const hasFigmaPat = figmaPatStatus?.configured || false;
+  const hasClaudeKey = !!apiKeyStatus;
+  const canExtract = hasFigmaPat && hasClaudeKey;
   
-  // Convex mutations
+  // Convex mutations & actions
   const createComponent = useMutation(api.components.create);
   const removeComponent = useMutation(api.components.remove);
-  const createExtractionRequest = useMutation(api.figmaExtraction.createExtractionRequest);
+  const extractAndBuild = useAction(api.claudeExtraction.extractAndBuildComponent);
   
   // Get selected saved component
   const selectedSavedComponent = components?.find(c => c._id === selectedComponentId);
   
-  // Watch for extraction completion
-  useEffect(() => {
-    if (extractionRequest?.status === 'completed' && extractionRequest.result) {
-      setExtractedResult(extractionRequest.result as ExtractionResult);
-      setExtractionStatus('completed');
-      if ((extractionRequest.result as ExtractionResult).variants?.length > 0) {
-        setSelectedVariant((extractionRequest.result as ExtractionResult).variants[0]);
-      }
-      setPendingRequestId(null);
-    } else if (extractionRequest?.status === 'failed') {
-      setExtractionStatus('failed');
-      setPendingRequestId(null);
-    }
-  }, [extractionRequest]);
-  
-  // Parse Figma URL
-  const parseFigmaUrl = (url: string): { fileKey: string; nodeId: string } | null => {
-    try {
-      const urlObj = new URL(url);
-      const pathParts = urlObj.pathname.split('/');
-      const designIndex = pathParts.indexOf('design');
-      const fileIndex = pathParts.indexOf('file');
-      const keyIndex = designIndex !== -1 ? designIndex + 1 : (fileIndex !== -1 ? fileIndex + 1 : -1);
-      if (keyIndex === -1 || keyIndex >= pathParts.length) return null;
-      const fileKey = pathParts[keyIndex];
-      const nodeId = urlObj.searchParams.get('node-id')?.replace('-', ':') || '';
-      return { fileKey, nodeId };
-    } catch {
-      return null;
-    }
-  };
-  
-  // Handle extraction request
-  const handleRequestExtraction = async () => {
-    if (!figmaUrl.trim() || !projectId || !userId) return;
+  // Handle extraction
+  const handleExtract = async () => {
+    if (!figmaUrl.trim() || !projectId || !userId || !canExtract) return;
     
-    const parsed = parseFigmaUrl(figmaUrl);
-    if (!parsed) {
-      alert('Invalid Figma URL');
-      return;
-    }
+    setIsExtracting(true);
+    setExtractionError(null);
     
     try {
-      const requestId = await createExtractionRequest({
+      const result = await extractAndBuild({
         projectId,
         userId,
         figmaUrl,
-        nodeId: parsed.nodeId,
       });
       
-      setPendingRequestId(requestId);
-      setExtractionStatus('pending');
-    } catch (error) {
-      console.error('Failed to create extraction request:', error);
+      setExtractedResult(result);
+      if (result.variants?.length > 0) {
+        setSelectedVariant(result.variants[0]);
+      }
+    } catch (error: any) {
+      console.error('Extraction failed:', error);
+      setExtractionError(error.message || 'Failed to extract component');
+    } finally {
+      setIsExtracting(false);
     }
   };
   
@@ -452,11 +391,11 @@ export const ComponentBuilder: React.FC = () => {
     try {
       const newId = await createComponent({
         projectId,
-        name: extractedResult.componentName,
+        name: extractedResult.name,
         status: 'draft',
         version: '1.0.0',
         code: extractedResult.code,
-        docs: `## ${extractedResult.componentName}\n\n${extractedResult.description || ''}\n\n### CSS\n\`\`\`css\n${extractedResult.css}\n\`\`\``,
+        docs: `## ${extractedResult.name}\n\n${extractedResult.description || ''}\n\n### CSS\n\`\`\`css\n${extractedResult.css}\n\`\`\``,
       });
       
       setSelectedComponentId(newId);
@@ -481,31 +420,34 @@ export const ComponentBuilder: React.FC = () => {
   // Handle feedback
   const handleFeedback = async (feedback: string) => {
     setIsRefining(true);
+    // TODO: Implement refinement with Claude
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsRefining(false);
   };
   
-  // Reset extraction
-  const handleCancelExtraction = () => {
-    setExtractionStatus('idle');
-    setPendingRequestId(null);
+  // Reset
+  const handleReset = () => {
+    setExtractedResult(null);
+    setSelectedVariant(null);
+    setFigmaUrl('');
+    setExtractionError(null);
   };
   
   return (
     <div className="flex h-full overflow-hidden relative">
-      {/* Extraction Status Overlay */}
-      <ExtractionStatus 
-        status={extractionStatus}
-        figmaUrl={figmaUrl}
-        onCancel={handleCancelExtraction}
-      />
-      
       {/* Left Panel: Component List */}
       <div className="w-72 border-r border-zinc-200/60 dark:border-zinc-800/60 flex flex-col bg-white dark:bg-zinc-900">
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Figma MCP Extraction</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Figma → React with Claude AI</p>
         </div>
+        
+        {/* API Key Status */}
+        {!canExtract && (
+          <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+            <ApiKeySetup hasFigmaPat={hasFigmaPat} hasClaudeKey={hasClaudeKey} />
+          </div>
+        )}
         
         {/* Figma URL Input */}
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
@@ -518,18 +460,35 @@ export const ComponentBuilder: React.FC = () => {
             value={figmaUrl}
             onChange={(e) => setFigmaUrl(e.target.value)}
             placeholder="Paste Figma component URL..."
-            className="w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-2"
+            disabled={!canExtract || isExtracting}
+            className="w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-2 disabled:opacity-50"
           />
           <button
-            onClick={handleRequestExtraction}
-            disabled={!figmaUrl.trim() || extractionStatus !== 'idle'}
+            onClick={handleExtract}
+            disabled={!figmaUrl.trim() || !canExtract || isExtracting}
             className="w-full h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
-            <Zap size={12} />
-            Extract with MCP
+            {isExtracting ? (
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <Zap size={12} />
+                Extract & Build
+              </>
+            )}
           </button>
+          
+          {extractionError && (
+            <div className="mt-2 p-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded text-xs text-red-600 dark:text-red-400">
+              {extractionError}
+            </div>
+          )}
+          
           <p className="text-[10px] text-zinc-400 mt-2 text-center">
-            Uses Figma Desktop MCP for 100% extraction
+            Extracts 100% of Figma properties with Claude AI
           </p>
         </div>
         
@@ -588,16 +547,35 @@ export const ComponentBuilder: React.FC = () => {
       </div>
       
       {/* Main Content Area */}
-      {extractedResult ? (
+      {isExtracting ? (
+        // Extracting state
+        <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-900">
+          <div className="text-center max-w-md px-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-6 animate-pulse">
+              <Sparkles size={32} className="text-white" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+              Claude is extracting...
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+              Analyzing Figma design, extracting properties, and generating production-ready React code.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
+              <Loader2 size={14} className="animate-spin" />
+              This may take 10-30 seconds
+            </div>
+          </div>
+        </div>
+      ) : extractedResult ? (
         <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                {extractedResult.componentName.charAt(0)}
+                {extractedResult.name.charAt(0)}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.componentName}</h3>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.name}</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedResult.description}</p>
               </div>
             </div>
@@ -609,12 +587,7 @@ export const ComponentBuilder: React.FC = () => {
                 <Check size={12} /> Save Component
               </button>
               <button
-                onClick={() => {
-                  setExtractedResult(null);
-                  setSelectedVariant(null);
-                  setFigmaUrl('');
-                  setExtractionStatus('idle');
-                }}
+                onClick={handleReset}
                 className="h-8 px-3 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
               >
                 <X size={12} /> Discard
@@ -780,12 +753,11 @@ export const ComponentBuilder: React.FC = () => {
               <Figma size={28} className="text-violet-500" />
             </div>
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Figma MCP Extraction
+              Figma to React with Claude AI
             </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              Paste a Figma component URL or select a node in Figma desktop. 
-              The MCP will extract 100% of design properties including variables, 
-              auto-layout, effects, and generate production-ready React code.
+              Paste a Figma component URL and Claude AI will extract 100% of design properties 
+              and generate production-ready React code with proper TypeScript types.
             </p>
             <div className="grid grid-cols-3 gap-4 text-xs text-zinc-400 mb-6">
               <div className="flex flex-col items-center gap-1">
@@ -807,14 +779,11 @@ export const ComponentBuilder: React.FC = () => {
                 <span>Variants</span>
               </div>
             </div>
-            <a
-              href="https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-Components-in-Figma"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-violet-500 hover:text-violet-600 flex items-center justify-center gap-1"
-            >
-              Learn about Figma components <ExternalLink size={10} />
-            </a>
+            {!canExtract && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Configure your API keys in Settings to get started
+              </p>
+            )}
           </div>
         </div>
       )}

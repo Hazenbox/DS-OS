@@ -68,13 +68,21 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     const [isFigmaSaving, setIsFigmaSaving] = useState(false);
     const [figmaSaved, setFigmaSaved] = useState(false);
 
+    // Claude API Key
+    const [claudeKey, setClaudeKey] = useState('');
+    const [showClaudeKey, setShowClaudeKey] = useState(false);
+    const [isClaudeSaving, setIsClaudeSaving] = useState(false);
+    const [claudeSaved, setClaudeSaved] = useState(false);
+
     // Clear data
     const [isClearing, setIsClearing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     // Convex - scoped to user
     const setThemeSetting = useMutation(api.settings.set);
+    const setSetting = useMutation(api.settings.set);
     const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
+    const claudeKeyStatus = useQuery(api.settings.get, userId ? { userId, key: 'claudeApiKey' } : "skip");
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
     const clearProjectData = useMutation(api.seed.clearProjectData);
 
@@ -109,6 +117,22 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
             console.error('Failed to save Figma PAT:', error);
         } finally {
             setIsFigmaSaving(false);
+        }
+    };
+
+    const handleSaveClaudeKey = async () => {
+        if (!claudeKey.trim() || !userId) return;
+        
+        setIsClaudeSaving(true);
+        try {
+            await setSetting({ userId, key: 'claudeApiKey', value: claudeKey });
+            setClaudeSaved(true);
+            setClaudeKey(''); // Clear input after saving
+            setTimeout(() => setClaudeSaved(false), 2000);
+        } catch (error) {
+            console.error('Failed to save Claude API key:', error);
+        } finally {
+            setIsClaudeSaving(false);
         }
     };
 
@@ -230,6 +254,71 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                         </div>
                     </div>
 
+                    {/* Claude API Key (for Component Builder) */}
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center flex-shrink-0">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-medium text-zinc-900 dark:text-white">Claude API Key</h3>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                                    Required for AI-powered component extraction in the Builder tab.
+                                </p>
+                                
+                                {claudeKeyStatus && (
+                                    <div className="mb-3 p-2 bg-green-500/10 border border-green-500/20 rounded flex items-center gap-2">
+                                        <Check size={14} className="text-green-500" />
+                                        <span className="text-xs text-green-600 dark:text-green-400">
+                                            API Key configured
+                                        </span>
+                                    </div>
+                                )}
+                                
+                                <div className="flex gap-2">
+                                    <div className="flex-1 relative">
+                                        <input
+                                            type={showClaudeKey ? 'text' : 'password'}
+                                            value={claudeKey}
+                                            onChange={(e) => setClaudeKey(e.target.value)}
+                                            placeholder={claudeKeyStatus ? 'Enter new key to replace' : 'sk-ant-xxxxxxxxxxxxx'}
+                                            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-md text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 pr-10"
+                                        />
+                                        <button
+                                            onClick={() => setShowClaudeKey(!showClaudeKey)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                                        >
+                                            {showClaudeKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={handleSaveClaudeKey}
+                                        disabled={!claudeKey.trim() || isClaudeSaving}
+                                        className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
+                                    >
+                                        {isClaudeSaving ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : claudeSaved ? (
+                                            <Check size={14} />
+                                        ) : null}
+                                        {claudeSaved ? 'Saved!' : 'Save'}
+                                    </button>
+                                </div>
+                                
+                                <a 
+                                    href="https://console.anthropic.com/settings/keys" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:underline mt-2"
+                                >
+                                    Get API key from Anthropic Console <ExternalLink size={12} />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Gemini API Key */}
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">
                         <div className="flex items-start gap-4">
@@ -238,7 +327,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                             </div>
                             <div className="flex-1">
                                 <h3 className="font-medium text-zinc-900 dark:text-white">Gemini API Key</h3>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Required for AI-powered component generation.</p>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Optional - for alternative AI-powered generation.</p>
                                 
                                 <div className="flex gap-2">
                                     <div className="flex-1 relative">
