@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -11,7 +11,7 @@ import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
 import { ViewState, convexTokenToLegacy, convexComponentToLegacy, convexActivityToLegacy } from './types';
-import { BookOpen, MessageSquare, Loader2, Database } from 'lucide-react';
+import { BookOpen, MessageSquare, Loader2 } from 'lucide-react';
 
 interface User {
   userId: string;
@@ -27,7 +27,6 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
-  const [isSeeding, setIsSeeding] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   
   // Authentication state
@@ -111,9 +110,6 @@ const App: React.FC = () => {
   const convexComponents = useQuery(api.components.list, {});
   const convexActivity = useQuery(api.activity.list, { limit: 50 });
 
-  // Convex mutations
-  const seedData = useMutation(api.seed.seedInitialData);
-
   // Check backend availability with timeout
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,23 +128,9 @@ const App: React.FC = () => {
   const components = convexComponents?.map(convexComponentToLegacy) || [];
   const activity = convexActivity?.map(convexActivityToLegacy) || [];
 
-  // Check if data needs seeding
-  const needsSeeding = convexTokens !== undefined && convexTokens.length === 0;
-
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     localStorage.setItem('themeMode', mode);
-  };
-
-  const handleSeedData = async () => {
-    setIsSeeding(true);
-    try {
-      await seedData();
-    } catch (error) {
-      console.error('Failed to seed data:', error);
-    } finally {
-      setIsSeeding(false);
-    }
   };
 
   // Authentication handlers
@@ -203,41 +185,6 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Connecting to database...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Empty state - offer to seed
-  if (needsSeeding) {
-    return (
-      <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 items-center justify-center">
-        <div className="flex flex-col items-center gap-6 max-w-md text-center p-8">
-          <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center">
-            <Database className="w-8 h-8 text-violet-500" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
-              Welcome to DS-OS
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Your database is empty. Would you like to seed it with initial design tokens and components?
-            </p>
-          </div>
-          <button
-            onClick={handleSeedData}
-            disabled={isSeeding}
-            className="px-6 py-2.5 bg-violet-600 text-white rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isSeeding ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Seeding...
-              </>
-            ) : (
-              'Seed Initial Data'
-            )}
-          </button>
         </div>
       </div>
     );

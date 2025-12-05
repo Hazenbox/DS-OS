@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   ];
 
   return (
-    <div className="w-64 h-full flex flex-col bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 transition-colors duration-200">
+    <div className="w-64 h-full flex flex-col bg-zinc-100 dark:bg-zinc-950 flex-shrink-0 transition-colors duration-200">
       <div className="px-4 pt-6 pb-2">
         <div className="flex items-center gap-3 mb-6 px-2">
             <div className="w-8 h-8 bg-bg-inverse text-inverse rounded-lg flex items-center justify-center">
