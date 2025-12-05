@@ -3,9 +3,8 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, Figma, FileJson, Check, ToggleLeft, ToggleRight, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, FileJson, Check, ToggleLeft, ToggleRight, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
-import { FigmaImport } from './FigmaImport';
 import { useProject } from '../contexts/ProjectContext';
 
 const TABS: { id: TokenType | 'all'; label: string }[] = [
@@ -360,8 +359,7 @@ export const TokenManager: React.FC = () => {
     const [editValue, setEditValue] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
-    const [showFigmaImport, setShowFigmaImport] = useState(false);
-    const [newToken, setNewToken] = useState({ name: '', value: '', description: '' });
+    const [newToken, setNewToken] = useState({ name: '', value: '', type: 'color' as TokenType, description: '' });
     
     // File management state
     const [editingFileId, setEditingFileId] = useState<string | null>(null);
@@ -425,17 +423,15 @@ export const TokenManager: React.FC = () => {
         if (!newToken.name || !newToken.value || !projectId || !userId) return;
         
         try {
-            const tokenType: TokenType = activeTab === 'all' ? 'unknown' : activeTab;
-            
             await createToken({
                 projectId,
                 userId,
                 name: newToken.name,
                 value: newToken.value,
-                type: tokenType,
+                type: newToken.type,
                 description: newToken.description || undefined,
             });
-            setNewToken({ name: '', value: '', description: '' });
+            setNewToken({ name: '', value: '', type: 'color', description: '' });
             setShowAddModal(false);
         } catch (error) {
             console.error('Failed to create token:', error);
@@ -615,13 +611,13 @@ export const TokenManager: React.FC = () => {
                             onChange={handleFileSelect}
                         />
                         
-                        {/* Figma Import */}
+                        {/* Add Token */}
                         <button 
-                            onClick={() => setShowFigmaImport(true)}
-                            title="Import Figma Variables"
-                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 rounded hover:bg-zinc-800 dark:hover:bg-zinc-600"
+                            onClick={() => setShowAddModal(true)}
+                            title="Add Token"
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 border border-violet-600 rounded hover:bg-violet-700"
                         >
-                            <Figma size={14} /> Figma
+                            <Plus size={14} /> Add
                         </button>
                         
                         {/* Import JSON */}
@@ -1051,30 +1047,82 @@ export const TokenManager: React.FC = () => {
                             </button>
                         </div>
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    value={newToken.name}
-                                    onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
-                                    placeholder="e.g., colors.primary.500"
-                                    className="w-full h-8 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
-                                />
+                            <div className="flex gap-3">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
+                                    <input
+                                        type="text"
+                                        value={newToken.name}
+                                        onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
+                                        placeholder="e.g., primary.500"
+                                        className="w-full h-8 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    />
+                                </div>
+                                <div className="w-28">
+                                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Type</label>
+                                    <select
+                                        value={newToken.type}
+                                        onChange={(e) => setNewToken({ ...newToken, type: e.target.value as TokenType })}
+                                        className="w-full h-8 px-2 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                    >
+                                        <option value="color">Color</option>
+                                        <option value="typography">Typography</option>
+                                        <option value="spacing">Spacing</option>
+                                        <option value="sizing">Sizing</option>
+                                        <option value="radius">Radius</option>
+                                        <option value="shadow">Shadow</option>
+                                        <option value="unknown">Other</option>
+                                    </select>
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-1">Value</label>
+                                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Value</label>
                                 <input
                                     type="text"
                                     value={newToken.value}
                                     onChange={(e) => setNewToken({ ...newToken, value: e.target.value })}
-                                    placeholder={activeTab === 'color' ? '#6366f1' : '16px'}
+                                    placeholder={
+                                        newToken.type === 'color' ? '#6366f1 or rgba(99, 102, 241, 1)' :
+                                        newToken.type === 'spacing' || newToken.type === 'sizing' ? '16px or 1rem' :
+                                        newToken.type === 'radius' ? '8px or 50%' :
+                                        newToken.type === 'shadow' ? '0 4px 6px rgba(0,0,0,0.1)' :
+                                        newToken.type === 'typography' ? 'Inter, 16px, 500' :
+                                        'Enter value'
+                                    }
                                     className="w-full h-8 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description (optional)</label>
+                                <input
+                                    type="text"
+                                    value={newToken.description}
+                                    onChange={(e) => setNewToken({ ...newToken, description: e.target.value })}
+                                    placeholder="Brief description of the token"
+                                    className="w-full h-8 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded text-sm bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
+                                />
+                            </div>
+                            
+                            {/* Preview */}
+                            {newToken.value && (
+                                <div className="pt-3 border-t border-zinc-200/60 dark:border-zinc-700/60">
+                                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Preview</label>
+                                    <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
+                                        {renderTokenPreview(newToken.type, newToken.value)}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{newToken.name || 'token-name'}</p>
+                                            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate">{newToken.value}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="flex justify-end gap-2 mt-6">
                             <button
-                                onClick={() => setShowAddModal(false)}
+                                onClick={() => {
+                                    setShowAddModal(false);
+                                    setNewToken({ name: '', value: '', type: 'color', description: '' });
+                                }}
                                 className="px-4 h-8 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                             >
                                 Cancel
@@ -1096,12 +1144,6 @@ export const TokenManager: React.FC = () => {
                 tokens={(tokens || []).map(convexTokenToLegacy)} 
                 isOpen={showExportModal} 
                 onClose={() => setShowExportModal(false)} 
-            />
-
-            {/* Figma Import Modal */}
-            <FigmaImport 
-                isOpen={showFigmaImport} 
-                onClose={() => setShowFigmaImport(false)} 
             />
         </div>
     );
