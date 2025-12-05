@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Loader2, AlertCircle, Eye, EyeOff, Github, Layers, Code2, GitBranch, Package } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, EyeOff, Github, Layers } from 'lucide-react';
 import { signInWithGoogle, signInWithGitHub, isGoogleConfigured, isGitHubConfigured, OAuthUserInfo } from '../services/oauthService';
 
 interface UserData {
@@ -121,47 +121,37 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onSwitchToLogin
 
   return (
     <div className="flex h-screen w-full bg-[#fafafa] dark:bg-[#0a0a0a]">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden p-8 flex-col justify-center bg-[#f0f0f0] dark:bg-[#0f0f0f]">
-        {/* Gradient glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[400px] rounded-full blur-[120px] opacity-30 dark:opacity-40 bg-gradient-to-b from-violet-500 to-transparent" />
+      {/* Left Panel - Hero Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        {/* Background Image */}
+        <img 
+          src="/auth-bg.jpg" 
+          alt="Cosmic landscape" 
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        
+        {/* Overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
         
         {/* Logo */}
         <div className="absolute top-8 left-8 z-10 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-violet-500/20 dark:bg-violet-500/30 flex items-center justify-center">
-            <Layers size={18} className="text-violet-600 dark:text-violet-400" />
+          <div className="w-8 h-8 rounded-lg bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+            <Layers size={18} className="text-white" />
           </div>
-          <span className="text-lg font-semibold text-zinc-900 dark:text-white">DS-OS</span>
+          <span className="text-lg font-semibold text-white">DS-OS</span>
         </div>
 
-        {/* Main Content */}
-        <div className="relative z-10 max-w-md mx-auto">
-          <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 leading-tight">
-            Build Better<br />
-            <span className="text-violet-600 dark:text-violet-400">Design Systems</span>
-          </h1>
-          <p className="text-zinc-600 dark:text-[#888] text-sm leading-relaxed mb-8">
-            Join teams using DS-OS to transform Figma designs into production-ready 
-            components with AI-powered generation and centralized token management.
-          </p>
-
-          {/* Features */}
-          <div className="space-y-3">
-            {[
-              { icon: Code2, label: 'Component Generation', desc: 'Figma to React in seconds' },
-              { icon: GitBranch, label: 'Version Control', desc: 'Track every change' },
-              { icon: Package, label: 'NPM Publishing', desc: 'Ship packages instantly' },
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white/50 dark:bg-white/5 border border-zinc-200 dark:border-white/10">
-                <div className="w-8 h-8 rounded-md bg-violet-500/10 flex items-center justify-center">
-                  <feature.icon size={16} className="text-violet-600 dark:text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-900 dark:text-white">{feature.label}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-500">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
+        {/* Bottom Content */}
+        <div className="absolute bottom-0 left-0 right-0 p-8 z-10">
+          <div className="max-w-md">
+            <h1 className="text-3xl font-bold text-white mb-3 leading-tight">
+              Build Better<br />
+              <span className="text-violet-300">Design Systems</span>
+            </h1>
+            <p className="text-white/70 text-sm leading-relaxed">
+              Join teams using DS-OS to transform Figma designs into production-ready 
+              components with AI-powered generation.
+            </p>
           </div>
         </div>
       </div>
