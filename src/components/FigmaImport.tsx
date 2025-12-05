@@ -272,32 +272,6 @@ export const FigmaImport: React.FC<FigmaImportProps> = ({ isOpen, onClose }) => 
                                 </button>
                             </div>
 
-                            {/* Instructions */}
-                            <div className="mt-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                                <h4 className="text-sm font-medium text-zinc-900 dark:text-white mb-2">How to export from Figma:</h4>
-                                <ol className="text-xs text-zinc-500 dark:text-zinc-400 space-y-1.5 list-decimal list-inside">
-                                    <li>Open your Figma file with Variables</li>
-                                    <li>Go to the Variables panel (right sidebar)</li>
-                                    <li>Click the menu (⋯) and select "Export variables"</li>
-                                    <li>Choose JSON format and download</li>
-                                    <li>Upload the JSON file here</li>
-                                </ol>
-                                
-                                <div className="mt-3 p-3 bg-white dark:bg-zinc-900 rounded border border-zinc-200 dark:border-zinc-700">
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Expected format:</p>
-                                    <pre className="text-[10px] text-zinc-900 dark:text-white font-mono overflow-x-auto">
-{`{
-  "brand": "default",
-  "theme": "light",
-  "tokens": {
-    "✦/bg/brand/default": "#0D99FF",
-    "✦/_text/text-default": "rgba(0, 0, 0, 0.9)",
-    ...
-  }
-}`}
-                                    </pre>
-                                </div>
-                            </div>
                         </>
                     ) : (
                         <>
