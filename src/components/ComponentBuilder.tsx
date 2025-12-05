@@ -434,6 +434,237 @@ const FeedbackPanel: React.FC<{
 };
 
 // ============================================================================
+// SAVED COMPONENT VIEW - Shows saved components with full interface
+// ============================================================================
+
+interface SavedComponent {
+  _id: any;
+  name: string;
+  status: string;
+  version: string;
+  code: string;
+  docs?: string;
+}
+
+const SavedComponentView: React.FC<{
+  component: SavedComponent;
+  tokens: Token[];
+  activeTab: 'preview' | 'code' | 'inspect';
+  setActiveTab: (tab: 'preview' | 'code' | 'inspect') => void;
+  onFeedback: (feedback: string) => void;
+  isRefining: boolean;
+}> = ({ component, tokens, activeTab, setActiveTab, onFeedback, isRefining }) => {
+  
+  // Extract CSS from docs if present (looks for ```css blocks)
+  const extractedCss = React.useMemo(() => {
+    if (!component.docs) return '';
+    const cssMatch = component.docs.match(/```css\n([\s\S]*?)```/);
+    return cssMatch ? cssMatch[1].trim() : '';
+  }, [component.docs]);
+  
+  // Parse component code to extract some basic properties for inspect
+  const extractedProperties = React.useMemo(() => {
+    const props: Record<string, any> = {};
+    
+    // Try to extract inline style properties from the code
+    const styleMatches = component.code.matchAll(/(\w+):\s*['"]?([^,}'"\n]+)['"]?/g);
+    for (const match of styleMatches) {
+      const [, key, value] = match;
+      if (['display', 'flexDirection', 'padding', 'gap', 'borderRadius', 'backgroundColor', 'color'].includes(key)) {
+        props[key] = value.trim();
+      }
+    }
+    
+    return props;
+  }, [component.code]);
+  
+  // Try to find used variables by looking for var(--xxx) or token references
+  const usedVariables = React.useMemo(() => {
+    const vars: Array<{ name: string; value: string; type?: string }> = [];
+    const varMatches = component.code.matchAll(/var\(--([^)]+)\)/g);
+    
+    for (const match of varMatches) {
+      const varName = match[1];
+      const token = tokens.find(t => t.name === varName || t.name.includes(varName));
+      if (token) {
+        vars.push({
+          name: token.name,
+          value: token.value,
+          type: token.type,
+        });
+      } else {
+        vars.push({
+          name: varName,
+          value: 'unknown',
+        });
+      }
+    }
+    
+    return vars;
+  }, [component.code, tokens]);
+  
+  return (
+    <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
+            {component.name.charAt(0)}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{component.name}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${
+                component.status === 'stable' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
+                component.status === 'review' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400' :
+                'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+              }`}>
+                {component.status}
+              </span>
+              <span className="text-[10px] text-zinc-400 font-mono">v{component.version}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Content Tabs */}
+      <div className="flex border-b border-zinc-200/60 dark:border-zinc-800/60 px-4">
+        {[
+          { id: 'preview', label: 'Preview', icon: <Eye size={14} /> },
+          { id: 'code', label: 'Code', icon: <Code size={14} /> },
+          { id: 'inspect', label: 'Inspect', icon: <Settings2 size={14} /> },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b transition-colors ${
+              activeTab === tab.id
+                ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white'
+                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 overflow-hidden">
+          {activeTab === 'preview' && (
+            <div className="h-full p-4">
+              <div className="h-full rounded-lg overflow-hidden border border-zinc-200/60 dark:border-zinc-800/60">
+                <ComponentPreview
+                  code={component.code}
+                  css={extractedCss}
+                  tokens={tokens}
+                  componentName={component.name}
+                />
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'code' && (
+            <div className="h-full p-4 overflow-auto">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Component Code</span>
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(component.code)}
+                      className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1"
+                    >
+                      <Copy size={12} /> Copy
+                    </button>
+                  </div>
+                  <pre className="p-4 bg-zinc-950 rounded-lg text-xs text-zinc-300 font-mono overflow-x-auto">
+                    {component.code}
+                  </pre>
+                </div>
+                {extractedCss && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">CSS</span>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(extractedCss)}
+                        className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1"
+                      >
+                        <Copy size={12} /> Copy
+                      </button>
+                    </div>
+                    <pre className="p-4 bg-zinc-950 rounded-lg text-xs text-zinc-300 font-mono overflow-x-auto">
+                      {extractedCss}
+                    </pre>
+                  </div>
+                )}
+                {component.docs && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Documentation</span>
+                    </div>
+                    <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg text-xs text-zinc-700 dark:text-zinc-300 prose prose-sm dark:prose-invert max-w-none">
+                      <pre className="whitespace-pre-wrap">{component.docs}</pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'inspect' && (
+            <InspectPanel
+              properties={extractedProperties}
+              usedVariables={usedVariables}
+            />
+          )}
+        </div>
+        
+        {/* Right Sidebar - Used Variables & Feedback */}
+        <div className="w-64 border-l border-zinc-200/60 dark:border-zinc-800/60 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Palette size={14} className="text-zinc-400" />
+              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Used Variables
+              </span>
+            </div>
+            {usedVariables.length > 0 ? (
+              <div className="space-y-2">
+                {usedVariables.map((variable, idx) => (
+                  <div key={idx} className="p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {variable.type === 'color' ? (
+                        <div 
+                          className="w-4 h-4 rounded border border-zinc-200 dark:border-zinc-700"
+                          style={{ backgroundColor: variable.value }}
+                        />
+                      ) : (
+                        <div className="w-4 h-4 rounded bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                          <Box size={10} className="text-zinc-500" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-zinc-900 dark:text-white truncate">{variable.name}</p>
+                        <p className="text-[10px] text-zinc-500 truncate">{variable.value}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">No variables detected</p>
+            )}
+          </div>
+          
+          <FeedbackPanel onSubmit={onFeedback} isProcessing={isRefining} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // API KEY SETUP PROMPT
 // ============================================================================
 
@@ -886,27 +1117,15 @@ export const ComponentBuilder: React.FC = () => {
           </div>
         </div>
       ) : selectedSavedComponent ? (
-        // Show saved component details
-        <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
-          <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{selectedSavedComponent.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${
-                selectedSavedComponent.status === 'stable' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
-                selectedSavedComponent.status === 'review' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400' :
-                'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-              }`}>
-                {selectedSavedComponent.status}
-              </span>
-              <span className="text-[10px] text-zinc-400 font-mono">v{selectedSavedComponent.version}</span>
-            </div>
-          </div>
-          <div className="flex-1 p-4 overflow-auto">
-            <pre className="p-4 bg-zinc-950 rounded-lg text-xs text-zinc-300 font-mono overflow-x-auto">
-              {selectedSavedComponent.code}
-            </pre>
-          </div>
-        </div>
+        // Show saved component with full view (preview, code, inspect, feedback)
+        <SavedComponentView 
+          component={selectedSavedComponent}
+          tokens={tokens}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onFeedback={handleFeedback}
+          isRefining={isRefining}
+        />
       ) : (
         // Empty state
         <div className="flex-1 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
