@@ -50,21 +50,19 @@ const AppContent: React.FC<{
           {currentView === 'settings' ? (
             <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 space-y-6">
-              <div className="w-20 h-20 rounded-2xl bg-violet-500/10 flex items-center justify-center">
-                <FolderOpen size={40} className="text-violet-500" strokeWidth={1.5} />
+            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400">
+              <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-3">
+                <FolderOpen size={24} className="text-violet-500" strokeWidth={1.5} />
               </div>
-              <div className="text-center space-y-2">
-                <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Create Your First Project</h2>
-                <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                  Projects help you organize your design tokens, components, and releases.
-                </p>
-              </div>
+              <h2 className="text-sm font-medium text-zinc-900 dark:text-white mb-1">Create Your First Project</h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                Organize your tokens, components, and releases.
+              </p>
               <button
                 onClick={() => setShowProjectModal(true)}
-                className="flex items-center gap-2 px-5 h-10 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 h-8 bg-violet-600 text-white rounded-md text-xs font-medium hover:bg-violet-700 transition-colors"
               >
-                <Plus size={18} />
+                <Plus size={14} />
                 Create Project
               </button>
             </div>

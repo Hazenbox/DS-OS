@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { X, Loader2, FolderPlus } from 'lucide-react';
+import { X, Loader2, FolderPlus, AlertCircle } from 'lucide-react';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
 
@@ -58,31 +58,35 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md border border-zinc-200/60 dark:border-zinc-800/60">
+      <div className="bg-white dark:bg-[#0a0a0a] rounded-lg shadow-2xl w-full max-w-sm border border-zinc-200 dark:border-white/10">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-              <FolderPlus size={20} className="text-violet-600 dark:text-violet-400" />
+        <div className="flex justify-between items-center px-4 py-3 border-b border-zinc-200 dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-md bg-violet-500/10 flex items-center justify-center">
+              <FolderPlus size={14} className="text-violet-600 dark:text-violet-400" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Create Project</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Start a new design system project</p>
-            </div>
+            <h3 className="text-sm font-medium text-zinc-900 dark:text-white">New Project</h3>
           </div>
           <button 
             onClick={onClose} 
-            className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1 rounded hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {error && (
+            <div className="p-2 rounded-md flex items-center gap-2 text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400">
+              <AlertCircle size={14} />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-1.5">
-              Project Name <span className="text-red-500">*</span>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">
+              Project Name
             </label>
             <input
               ref={inputRef}
@@ -90,37 +94,31 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Design System"
-              className="w-full h-9 px-3 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              className="w-full h-8 px-3 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all"
               disabled={isSubmitting}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-1.5">
-              Description <span className="text-zinc-400 text-xs font-normal">(optional)</span>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-white/80 mb-1.5">
+              Description <span className="text-zinc-400 dark:text-zinc-600 font-normal">(optional)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="A brief description of your project..."
-              rows={3}
-              className="w-full px-3 py-2 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-sm bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none"
+              placeholder="A brief description..."
+              rows={2}
+              className="w-full px-3 py-2 rounded-md text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all resize-none"
               disabled={isSubmitting}
             />
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
           {/* Footer */}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 h-9 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="px-3 h-8 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-md hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
               disabled={isSubmitting}
             >
               Cancel
@@ -128,9 +126,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
             <button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="px-4 h-9 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-3 h-8 text-xs font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
             >
-              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              {isSubmitting && <Loader2 size={12} className="animate-spin" />}
               Create Project
             </button>
           </div>
@@ -139,4 +137,3 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
     </div>
   );
 };
-
