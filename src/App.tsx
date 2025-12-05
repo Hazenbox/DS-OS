@@ -48,35 +48,44 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Handle system theme detection and changes
+  // Apply theme immediately when themeMode changes
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
-    const updateResolvedTheme = () => {
-      if (themeMode === 'system') {
-        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-      } else {
-        setResolvedTheme(themeMode);
-      }
-    };
-
-    updateResolvedTheme();
-
-    // Listen for system theme changes
-    const handler = () => updateResolvedTheme();
-    mediaQuery.addEventListener('change', handler);
+    // Determine the resolved theme
+    let newResolvedTheme: 'light' | 'dark';
+    if (themeMode === 'system') {
+      newResolvedTheme = mediaQuery.matches ? 'dark' : 'light';
+    } else {
+      newResolvedTheme = themeMode;
+    }
     
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [themeMode]);
-
-  // Apply theme to document
-  useEffect(() => {
-    if (resolvedTheme === 'dark') {
+    // Update state
+    setResolvedTheme(newResolvedTheme);
+    
+    // Apply to DOM immediately (don't wait for state update)
+    if (newResolvedTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [resolvedTheme]);
+
+    // Listen for system theme changes (only matters if mode is 'system')
+    const handler = () => {
+      if (themeMode === 'system') {
+        const isDark = mediaQuery.matches;
+        setResolvedTheme(isDark ? 'dark' : 'light');
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [themeMode]);
 
   // Check for stored user on mount
   useEffect(() => {
