@@ -66,11 +66,15 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_action", ["action"]),
 
-  // Settings (global, user-level)
+  // Settings - scoped to user
   settings: defineTable({
+    userId: v.optional(v.string()), // Owner's email (optional for legacy data)
     key: v.string(),
     value: v.string(),
-  }).index("by_key", ["key"]),
+  })
+    .index("by_key", ["key"])
+    .index("by_user", ["userId"])
+    .index("by_user_key", ["userId", "key"]),
 
   // Releases - scoped to project
   releases: defineTable({

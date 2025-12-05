@@ -3,6 +3,7 @@ import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Token } from '../types';
 import { Figma, Loader2, AlertCircle, Check, ExternalLink, X, Sparkles, Settings, Layers, Box, Palette } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
 interface FigmaComponentGeneratorProps {
     isOpen: boolean;
@@ -22,6 +23,7 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
     tokens,
     onComponentGenerated 
 }) => {
+    const { userId, projectId } = useProject();
     const [figmaUrl, setFigmaUrl] = useState('');
     const [step, setStep] = useState<'input' | 'fetching' | 'preview' | 'generating' | 'success' | 'error'>('input');
     const [error, setError] = useState<string | null>(null);
@@ -29,9 +31,9 @@ export const FigmaComponentGenerator: React.FC<FigmaComponentGeneratorProps> = (
     const [extractedProps, setExtractedProps] = useState<any>(null);
     const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
-    // Convex
-    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus);
-    const figmaPat = useQuery(api.figma.getFigmaPat);
+    // Convex - scoped to user
+    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
+    const figmaPat = useQuery(api.figma.getFigmaPat, userId ? { userId } : "skip");
     const fetchFigmaNode = useAction(api.figma.fetchFigmaNode);
     const generateCode = useAction(api.figma.generateComponentCode);
     const createComponent = useMutation(api.components.create);
@@ -172,7 +174,14 @@ import { ${componentName} } from '@org/ui';
 Generated from Figma node: \`${nodeInfo?.nodeId}\`
 `;
             
+            if (!projectId) {
+                setError('No project selected');
+                setStep('error');
+                return;
+            }
+            
             const componentId = await createComponent({
+                projectId,
                 name: componentName,
                 status: 'draft',
                 version: '0.1.0',

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Moon, Sun, Monitor, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ThemeMode } from '../App';
+import { useProject } from '../contexts/ProjectContext';
 
 interface SettingsProps {
     themeMode: ThemeMode;
@@ -54,6 +55,8 @@ const ThemeSwitcher: React.FC<{
 };
 
 export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, onThemeModeChange }) => {
+    const { userId, projectId } = useProject();
+    
     const [geminiKey, setGeminiKey] = useState('');
     const [showGeminiKey, setShowGeminiKey] = useState(false);
     const [isGeminiSaving, setIsGeminiSaving] = useState(false);
@@ -69,15 +72,15 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     const [isClearing, setIsClearing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-    // Convex
+    // Convex - scoped to user
     const setThemeSetting = useMutation(api.settings.set);
-    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus);
+    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
-    const clearAllData = useMutation(api.seed.clearAllData);
+    const clearProjectData = useMutation(api.seed.clearProjectData);
 
     const handleThemeModeChange = async (mode: ThemeMode) => {
         onThemeModeChange(mode);
-        await setThemeSetting({ key: 'themeMode', value: mode });
+        // Theme is stored in localStorage, not Convex (per-device preference)
     };
 
     const handleSaveGeminiKey = async () => {
@@ -94,11 +97,11 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     };
 
     const handleSaveFigmaPat = async () => {
-        if (!figmaPat.trim()) return;
+        if (!figmaPat.trim() || !userId) return;
         
         setIsFigmaSaving(true);
         try {
-            await saveFigmaPat({ pat: figmaPat });
+            await saveFigmaPat({ userId, pat: figmaPat });
             setFigmaSaved(true);
             setFigmaPat(''); // Clear input after saving
             setTimeout(() => setFigmaSaved(false), 2000);
@@ -373,14 +376,15 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                         ) : (
                             <div className="space-y-3">
                                 <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                                    Are you sure? This will delete all tokens, components, releases, and activity.
+                                    Are you sure? This will delete all tokens, components, releases, and activity for this project.
                                 </p>
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={async () => {
+                                            if (!projectId) return;
                                             setIsClearing(true);
                                             try {
-                                                await clearAllData();
+                                                await clearProjectData({ projectId });
                                                 setShowClearConfirm(false);
                                             } catch (error) {
                                                 console.error('Failed to clear data:', error);
@@ -388,11 +392,11 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                                 setIsClearing(false);
                                             }
                                         }}
-                                        disabled={isClearing}
+                                        disabled={isClearing || !projectId}
                                         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
                                     >
                                         {isClearing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                        {isClearing ? 'Clearing...' : 'Yes, Clear Everything'}
+                                        {isClearing ? 'Clearing...' : 'Yes, Clear Project Data'}
                                     </button>
                                     <button 
                                         onClick={() => setShowClearConfirm(false)}

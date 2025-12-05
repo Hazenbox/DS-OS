@@ -559,21 +559,25 @@ export default ${name};
   },
 });
 
-// Store Figma PAT securely
+// Store Figma PAT securely - scoped to user
 export const setFigmaPat = mutation({
-  args: { pat: v.string() },
+  args: { 
+    userId: v.string(),
+    pat: v.string() 
+  },
   handler: async (ctx, args) => {
-    // Store encrypted or as a setting
-    // In production, use proper encryption
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "figma_pat"))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", args.userId).eq("key", "figma_pat")
+      )
       .first();
     
     if (existing) {
       await ctx.db.patch(existing._id, { value: args.pat });
     } else {
       await ctx.db.insert("settings", {
+        userId: args.userId,
         key: "figma_pat",
         value: args.pat,
       });
@@ -583,13 +587,22 @@ export const setFigmaPat = mutation({
   },
 });
 
-// Get Figma PAT (masked)
+// Get Figma PAT status (masked) - scoped to user
 export const getFigmaPatStatus = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    userId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    if (!userId) {
+      return { configured: false, masked: null };
+    }
+    
     const setting = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "figma_pat"))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", userId).eq("key", "figma_pat")
+      )
       .first();
     
     if (!setting || !setting.value) {
@@ -604,13 +617,22 @@ export const getFigmaPatStatus = query({
   },
 });
 
-// Get raw PAT for API calls (internal use)
+// Get raw PAT for API calls - scoped to user
 export const getFigmaPat = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    userId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    if (!userId) {
+      return null;
+    }
+    
     const setting = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "figma_pat"))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", userId).eq("key", "figma_pat")
+      )
       .first();
     
     return setting?.value || null;

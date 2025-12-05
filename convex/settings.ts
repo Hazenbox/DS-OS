@@ -1,36 +1,49 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
-// Get a setting by key
+// Get a setting by key for a specific user
 export const get = query({
-  args: { key: v.string() },
+  args: { 
+    userId: v.string(),
+    key: v.string() 
+  },
   handler: async (ctx, args) => {
     const setting = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", args.userId).eq("key", args.key)
+      )
       .first();
     return setting?.value ?? null;
   },
 });
 
-// Get all settings
+// Get all settings for a user
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("settings").collect();
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
   },
 });
 
-// Set a setting (upsert)
+// Set a setting for a user (upsert)
 export const set = mutation({
   args: {
+    userId: v.string(),
     key: v.string(),
     value: v.string(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", args.userId).eq("key", args.key)
+      )
       .first();
     
     if (existing) {
@@ -38,6 +51,7 @@ export const set = mutation({
       return existing._id;
     } else {
       return await ctx.db.insert("settings", {
+        userId: args.userId,
         key: args.key,
         value: args.value,
       });
@@ -45,13 +59,18 @@ export const set = mutation({
   },
 });
 
-// Delete a setting
+// Delete a setting for a user
 export const remove = mutation({
-  args: { key: v.string() },
+  args: { 
+    userId: v.string(),
+    key: v.string() 
+  },
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .withIndex("by_user_key", (q) => 
+        q.eq("userId", args.userId).eq("key", args.key)
+      )
       .first();
     
     if (existing) {
@@ -59,4 +78,3 @@ export const remove = mutation({
     }
   },
 });
-
