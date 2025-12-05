@@ -86,11 +86,19 @@ export default defineSchema({
     email: v.string(),
     emailVerified: v.boolean(),
     name: v.optional(v.string()),
+    image: v.optional(v.string()), // Profile picture from OAuth
     role: v.union(v.literal("admin"), v.literal("user")),
+    provider: v.optional(v.union(
+      v.literal("email"),
+      v.literal("google"),
+      v.literal("github")
+    )),
+    providerId: v.optional(v.string()), // OAuth provider's user ID
     createdAt: v.number(),
     lastLoginAt: v.optional(v.number()),
   })
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_provider", ["provider", "providerId"]),
 
   // Email verification tokens
   emailVerifications: defineTable({
@@ -102,4 +110,3 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_user", ["userId"]),
 });
-

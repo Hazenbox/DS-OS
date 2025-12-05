@@ -1,6 +1,5 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
 
 // Sign up with email and password
 export const signup = mutation({
@@ -20,26 +19,138 @@ export const signup = mutation({
       throw new Error("User with this email already exists");
     }
 
-    // In a real implementation, you would hash the password
-    // For now, we'll store it (NOT RECOMMENDED FOR PRODUCTION)
-    // In production, use Convex's built-in auth or a proper password hashing library
-    
     // Create user with email auto-verified
     const userId = await ctx.db.insert("users", {
       email: args.email,
-      emailVerified: true, // Auto-verify email
+      emailVerified: true,
       name: args.name || args.email.split("@")[0],
       role: "user",
+      provider: "email",
       createdAt: Date.now(),
     });
 
-    // Email is auto-verified, no need for verification token
     return {
       userId,
       email: args.email,
       name: args.name || args.email.split("@")[0],
       role: "user",
       message: "User created successfully.",
+    };
+  },
+});
+
+// Login with email/password
+export const login = mutation({
+  args: {
+    email: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (!user) {
+      throw new Error("Invalid email or password");
+    }
+
+    // Update last login
+    await ctx.db.patch(user._id, {
+      lastLoginAt: Date.now(),
+    });
+
+    return {
+      userId: user._id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      role: user.role,
+    };
+  },
+});
+
+// OAuth login/signup (Google or GitHub)
+export const oauthLogin = mutation({
+  args: {
+    provider: v.union(v.literal("google"), v.literal("github")),
+    providerId: v.string(),
+    email: v.string(),
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Check if user exists by provider ID
+    const existingByProvider = await ctx.db
+      .query("users")
+      .withIndex("by_provider", (q) => 
+        q.eq("provider", args.provider).eq("providerId", args.providerId)
+      )
+      .first();
+
+    if (existingByProvider) {
+      // Update last login and potentially update profile info
+      await ctx.db.patch(existingByProvider._id, {
+        lastLoginAt: Date.now(),
+        name: args.name || existingByProvider.name,
+        image: args.image || existingByProvider.image,
+      });
+
+      return {
+        userId: existingByProvider._id,
+        email: existingByProvider.email,
+        name: args.name || existingByProvider.name,
+        image: args.image || existingByProvider.image,
+        role: existingByProvider.role,
+        isNewUser: false,
+      };
+    }
+
+    // Check if user exists by email (link accounts)
+    const existingByEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+
+    if (existingByEmail) {
+      // Link the OAuth provider to existing account
+      await ctx.db.patch(existingByEmail._id, {
+        provider: args.provider,
+        providerId: args.providerId,
+        image: args.image || existingByEmail.image,
+        lastLoginAt: Date.now(),
+      });
+
+      return {
+        userId: existingByEmail._id,
+        email: existingByEmail.email,
+        name: existingByEmail.name,
+        image: args.image || existingByEmail.image,
+        role: existingByEmail.role,
+        isNewUser: false,
+      };
+    }
+
+    // Create new user
+    const userId = await ctx.db.insert("users", {
+      email: args.email,
+      emailVerified: true, // OAuth emails are verified
+      name: args.name || args.email.split("@")[0],
+      image: args.image,
+      role: "user",
+      provider: args.provider,
+      providerId: args.providerId,
+      createdAt: Date.now(),
+      lastLoginAt: Date.now(),
+    });
+
+    return {
+      userId,
+      email: args.email,
+      name: args.name || args.email.split("@")[0],
+      image: args.image,
+      role: "user",
+      isNewUser: true,
     };
   },
 });
@@ -81,45 +192,6 @@ export const verifyEmail = mutation({
   },
 });
 
-// Login (simplified - in production use proper auth)
-export const login = mutation({
-  args: {
-    email: v.string(),
-    password: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-
-    if (!user) {
-      throw new Error("Invalid email or password");
-    }
-
-    // Email is auto-verified, so this check is not needed
-    // But keeping it for safety in case verification is re-enabled
-    // if (!user.emailVerified) {
-    //   throw new Error("Please verify your email before logging in");
-    // }
-
-    // In production, verify password hash here
-    // For now, we'll just check if user exists and is verified
-
-    // Update last login
-    await ctx.db.patch(user._id, {
-      lastLoginAt: Date.now(),
-    });
-
-    return {
-      userId: user._id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-  },
-});
-
 // Get current user
 export const getCurrentUser = query({
   args: {
@@ -134,6 +206,7 @@ export const getCurrentUser = query({
       id: user._id,
       email: user.email,
       name: user.name,
+      image: user.image,
       role: user.role,
       emailVerified: user.emailVerified,
     };
@@ -189,4 +262,3 @@ export const resendVerification = mutation({
     };
   },
 });
-
