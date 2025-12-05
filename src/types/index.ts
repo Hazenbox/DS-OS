@@ -30,7 +30,8 @@ export interface TokenActivity {
   user: string;
   action: 'create' | 'update' | 'delete' | 'import' | 'download' | 'release';
   target: string;
-  timestamp: string;
+  targetType: 'token' | 'component' | 'release' | 'system';
+  timestamp: number;
 }
 
 // Convex Activity type
@@ -116,6 +117,7 @@ export function convexActivityToLegacy(activity: ConvexActivity): TokenActivity 
     user: activity.user,
     action: activity.action,
     target: activity.target,
-    timestamp: new Date(activity._creationTime).toISOString(),
+    targetType: activity.targetType,
+    timestamp: activity._creationTime,
   };
 }
