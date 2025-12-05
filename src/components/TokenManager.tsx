@@ -3,7 +3,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
-import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, Figma, FileJson, Check, ToggleLeft, ToggleRight, MoreVertical, Pencil } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, Upload, Download, LayoutGrid, List as ListIcon, X, Figma, FileJson, Check, ToggleLeft, ToggleRight, MoreVertical, Pencil, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { FigmaImport } from './FigmaImport';
 import { useProject } from '../contexts/ProjectContext';
@@ -31,6 +31,217 @@ interface TokenFile {
     uploadedBy: string;
 }
 
+// Parsed token for preview
+interface ParsedToken {
+    name: string;
+    value: string;
+    type: TokenType;
+    description?: string;
+}
+
+// ============================================================================
+// TOKEN PARSING UTILITIES
+// ============================================================================
+
+// Detect if a string value looks like a color
+const isColorValue = (value: string): boolean => {
+    const v = value.trim();
+    // Hex colors
+    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) return true;
+    // RGB/RGBA
+    if (/^rgba?\s*\(/i.test(v)) return true;
+    // HSL/HSLA
+    if (/^hsla?\s*\(/i.test(v)) return true;
+    // Named colors (common ones)
+    const namedColors = ['transparent', 'currentcolor', 'inherit', 'white', 'black', 'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'gray', 'grey'];
+    if (namedColors.includes(v.toLowerCase())) return true;
+    return false;
+};
+
+// Detect if a value looks like a shadow
+const isShadowValue = (value: string): boolean => {
+    const v = value.trim().toLowerCase();
+    // Box shadow pattern: offset-x offset-y blur spread color
+    if (/^-?\d+(\.\d+)?(px|rem|em)?\s+-?\d+(\.\d+)?(px|rem|em)?/.test(v)) return true;
+    // Multiple shadows
+    if (v.includes(',') && /\d+px/.test(v)) return true;
+    // Contains shadow keywords
+    if (v.includes('inset') || /rgba?\s*\(.*\)/.test(v) && /\d+px/.test(v)) return true;
+    return false;
+};
+
+// Detect if a value looks like a size/spacing value
+const isSizeValue = (value: string): boolean => {
+    const v = value.trim();
+    // Numeric with units
+    if (/^-?\d+(\.\d+)?(px|rem|em|%|vh|vw|pt|cm|mm|in)$/.test(v)) return true;
+    // Just a number (could be pixels or unitless)
+    if (/^\d+(\.\d+)?$/.test(v)) return true;
+    return false;
+};
+
+// Detect if a value looks like typography
+const isTypographyValue = (value: string): boolean => {
+    const v = value.trim().toLowerCase();
+    // Font weights
+    if (/^(normal|bold|bolder|lighter|\d{3})$/.test(v)) return true;
+    // Font families
+    if (/^["']?[a-zA-Z\s-]+["']?(,\s*["']?[a-zA-Z\s-]+["']?)*$/.test(v) && !isColorValue(v)) return true;
+    // Line heights (typically 1-3)
+    if (/^[\d.]+$/.test(v) && parseFloat(v) >= 0.5 && parseFloat(v) <= 3) return true;
+    // Letter spacing
+    if (/^-?[\d.]+(px|em|rem)?$/.test(v) && v.includes('.')) return true;
+    return false;
+};
+
+// Detect if a value looks like a border radius
+const isRadiusValue = (value: string): boolean => {
+    const v = value.trim().toLowerCase();
+    // Percentage or pixel values that are typically radius sizes
+    if (/^\d+(\.\d+)?(px|rem|em|%)$/.test(v)) {
+        const num = parseFloat(v);
+        // Radius values are typically 0-50px or 0-50%
+        if (v.includes('%') && num <= 100) return true;
+        if (num <= 100) return true;
+    }
+    return false;
+};
+
+// Infer token type from the key path
+const inferTypeFromKey = (keyPath: string): TokenType | null => {
+    const lower = keyPath.toLowerCase();
+    
+    // Color patterns
+    if (/\b(color|colours?|fill|stroke|background|bg|foreground|fg|surface|border-color|text-color|icon-color)\b/.test(lower)) return 'color';
+    if (/\b(primary|secondary|tertiary|accent|brand|neutral|success|warning|error|info|danger)\b/.test(lower) && !lower.includes('size') && !lower.includes('space')) return 'color';
+    if (/\b(white|black|gray|grey|red|blue|green|yellow|orange|purple|pink|teal|cyan|indigo|violet)\b/.test(lower)) return 'color';
+    
+    // Shadow patterns
+    if (/\b(shadow|elevation|drop-shadow|box-shadow)\b/.test(lower)) return 'shadow';
+    
+    // Spacing patterns
+    if (/\b(space|spacing|gap|margin|padding|inset|gutter)\b/.test(lower)) return 'spacing';
+    
+    // Sizing patterns  
+    if (/\b(size|sizing|width|height|min-width|max-width|min-height|max-height|icon-size)\b/.test(lower)) return 'sizing';
+    
+    // Typography patterns
+    if (/\b(font|typography|text|letter-spacing|line-height|font-size|font-weight|font-family|heading|body|display|caption|label)\b/.test(lower)) return 'typography';
+    
+    // Radius patterns
+    if (/\b(radius|radii|corner|rounded|border-radius)\b/.test(lower)) return 'radius';
+    
+    return null;
+};
+
+// Infer token type from value
+const inferTypeFromValue = (value: string): TokenType => {
+    if (isColorValue(value)) return 'color';
+    if (isShadowValue(value)) return 'shadow';
+    if (isSizeValue(value)) return 'spacing'; // Default numeric to spacing
+    if (isTypographyValue(value)) return 'typography';
+    return 'unknown';
+};
+
+// Main parsing function - handles multiple JSON formats
+const parseTokensFromJSON = (json: any, parentKey: string = ''): ParsedToken[] => {
+    const tokens: ParsedToken[] = [];
+    
+    if (json === null || json === undefined) return tokens;
+    
+    // If it's a primitive value, create a token
+    if (typeof json === 'string' || typeof json === 'number' || typeof json === 'boolean') {
+        const value = String(json);
+        const keyType = inferTypeFromKey(parentKey);
+        const valueType = inferTypeFromValue(value);
+        
+        tokens.push({
+            name: parentKey || 'token',
+            value: value,
+            type: keyType || valueType,
+        });
+        return tokens;
+    }
+    
+    // If it's an array, process each item
+    if (Array.isArray(json)) {
+        json.forEach((item, index) => {
+            const newKey = parentKey ? `${parentKey}-${index}` : String(index);
+            tokens.push(...parseTokensFromJSON(item, newKey));
+        });
+        return tokens;
+    }
+    
+    // If it's an object
+    if (typeof json === 'object') {
+        // Check for Design Token Community Group format ($value)
+        if ('$value' in json) {
+            const value = String(json.$value);
+            const keyType = inferTypeFromKey(parentKey);
+            const valueType = inferTypeFromValue(value);
+            const explicitType = json.$type ? mapDTCGType(json.$type) : null;
+            
+            tokens.push({
+                name: parentKey || 'token',
+                value: value,
+                type: explicitType || keyType || valueType,
+                description: json.$description,
+            });
+            return tokens;
+        }
+        
+        // Check for simple {value: ...} format
+        if ('value' in json && (typeof json.value === 'string' || typeof json.value === 'number')) {
+            const value = String(json.value);
+            const keyType = inferTypeFromKey(parentKey);
+            const valueType = inferTypeFromValue(value);
+            
+            tokens.push({
+                name: parentKey || 'token',
+                value: value,
+                type: keyType || valueType,
+                description: json.description,
+            });
+            return tokens;
+        }
+        
+        // Recursively process object keys
+        for (const key of Object.keys(json)) {
+            // Skip metadata keys
+            if (key.startsWith('$') || key.startsWith('_')) continue;
+            
+            const newKey = parentKey ? `${parentKey}/${key}` : key;
+            tokens.push(...parseTokensFromJSON(json[key], newKey));
+        }
+    }
+    
+    return tokens;
+};
+
+// Map DTCG $type to our TokenType
+const mapDTCGType = (dtcgType: string): TokenType | null => {
+    const typeMap: Record<string, TokenType> = {
+        'color': 'color',
+        'dimension': 'spacing',
+        'spacing': 'spacing',
+        'sizing': 'sizing',
+        'fontFamily': 'typography',
+        'fontWeight': 'typography',
+        'fontSize': 'typography',
+        'lineHeight': 'typography',
+        'letterSpacing': 'typography',
+        'typography': 'typography',
+        'shadow': 'shadow',
+        'borderRadius': 'radius',
+        'radius': 'radius',
+    };
+    return typeMap[dtcgType] || null;
+};
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export const TokenManager: React.FC = () => {
     const { projectId, userId } = useProject();
     const [activeTab, setActiveTab] = useState<TokenType | 'all'>('all');
@@ -47,6 +258,12 @@ export const TokenManager: React.FC = () => {
     const [editingFileId, setEditingFileId] = useState<string | null>(null);
     const [editingFileName, setEditingFileName] = useState('');
     const [fileMenuOpen, setFileMenuOpen] = useState<string | null>(null);
+    
+    // Import preview state
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewTokens, setPreviewTokens] = useState<ParsedToken[]>([]);
+    const [previewFileName, setPreviewFileName] = useState('');
+    const [previewFileContent, setPreviewFileContent] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +316,6 @@ export const TokenManager: React.FC = () => {
         if (!newToken.name || !newToken.value || !projectId || !userId) return;
         
         try {
-            // Determine token type - if on 'all' tab, default to 'unknown'
             const tokenType: TokenType = activeTab === 'all' ? 'unknown' : activeTab;
             
             await createToken({
@@ -117,203 +333,77 @@ export const TokenManager: React.FC = () => {
         }
     };
 
-    // Detect token type from value
-    const detectTypeFromValue = (value: string): TokenType | null => {
-        const v = value.trim().toLowerCase();
-        
-        // Color patterns
-        if (/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)) return 'color';
-        if (/^rgb(a)?\s*\(/.test(v)) return 'color';
-        if (/^hsl(a)?\s*\(/.test(v)) return 'color';
-        
-        // Shadow patterns
-        if (/^\d+px\s+\d+px\s+\d+px/.test(v)) return 'shadow';
-        if (v.includes('box-shadow') || v.includes('drop-shadow')) return 'shadow';
-        
-        // Spacing/sizing patterns (px, rem, em values)
-        if (/^\d+(\.\d+)?(px|rem|em|%)$/.test(v)) {
-            // Could be spacing or sizing - default to spacing
-            return 'spacing';
-        }
-        
-        // Typography patterns
-        if (/^\d+(\.\d+)?(px|rem|em|pt)$/.test(v) && parseFloat(v) >= 8 && parseFloat(v) <= 120) {
-            // Font sizes typically 8-120
-            return 'typography';
-        }
-        if (/^(normal|bold|lighter|bolder|\d{3})$/.test(v)) return 'typography';
-        if (/^[\d.]+$/.test(v) && parseFloat(v) >= 0.5 && parseFloat(v) <= 3) {
-            // Line heights typically 0.5-3
-            return 'typography';
-        }
-        
-        return null;
-    };
+    // Handle file selection - parse and show preview
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-    // Detect token type from key name
-    const detectTypeFromKey = (key: string): TokenType | null => {
-        const lowerKey = key.toLowerCase();
-        
-        // Color keywords
-        if (/color|colours?|fill|stroke|background|bg|foreground|fg|primary|secondary|accent|brand|neutral|gray|grey|red|blue|green|yellow|orange|purple|pink|teal|cyan/.test(lowerKey)) {
-            return 'color';
-        }
-        
-        // Spacing keywords
-        if (/space|spacing|gap|margin|padding|inset/.test(lowerKey)) {
-            return 'spacing';
-        }
-        
-        // Sizing keywords
-        if (/size|sizing|width|height|min|max/.test(lowerKey)) {
-            return 'sizing';
-        }
-        
-        // Typography keywords
-        if (/font|typography|text|letter|line|paragraph|heading|body|display|caption/.test(lowerKey)) {
-            return 'typography';
-        }
-        
-        // Radius keywords
-        if (/radius|radii|corner|rounded|border-radius/.test(lowerKey)) {
-            return 'radius';
-        }
-        
-        // Shadow keywords
-        if (/shadow|elevation|depth/.test(lowerKey)) {
-            return 'shadow';
-        }
-        
-        return null;
-    };
-
-    const flattenTokens = (obj: any, prefix: string = '', inheritedType: TokenType = 'unknown'): Array<{
-        name: string;
-        value: string;
-        type: TokenType;
-        description?: string;
-    }> => {
-        const result: Array<{
-            name: string;
-            value: string;
-            type: TokenType;
-            description?: string;
-        }> = [];
-        
-        for (const key in obj) {
-            const val = obj[key];
-            const newKey = prefix ? `${prefix}-${key}` : key;
-            
-            // Try to detect type from key name first
-            const keyType = detectTypeFromKey(key) || detectTypeFromKey(newKey);
-            let currentType = keyType || inheritedType;
-
-            if (typeof val === 'string' || typeof val === 'number') {
-                const strVal = val.toString();
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const content = event.target?.result as string;
+                const json = JSON.parse(content);
+                const parsed = parseTokensFromJSON(json);
                 
-                // If still unknown, try to detect from value
-                if (currentType === 'unknown') {
-                    const valueType = detectTypeFromValue(strVal);
-                    if (valueType) currentType = valueType;
-                }
+                console.log('[TokenManager] Parsed tokens:', parsed);
                 
-                result.push({
-                    name: newKey,
-                    value: strVal,
-                    type: currentType
-                });
-            } else if (typeof val === 'object' && val !== null) {
-                // Handle Figma-style $value objects
-                if (val.$value !== undefined) {
-                    const strVal = val.$value.toString();
-                    if (currentType === 'unknown') {
-                        const valueType = detectTypeFromValue(strVal);
-                        if (valueType) currentType = valueType;
-                    }
-                    result.push({
-                        name: newKey,
-                        value: strVal,
-                        type: currentType,
-                        description: val.$description,
-                    });
-                } else if (val.value !== undefined && typeof val.value !== 'object') {
-                    // Handle {value: "...", description: "..."} format
-                    const strVal = val.value.toString();
-                    if (currentType === 'unknown') {
-                        const valueType = detectTypeFromValue(strVal);
-                        if (valueType) currentType = valueType;
-                    }
-                    result.push({
-                        name: newKey,
-                        value: strVal,
-                        type: currentType,
-                        description: val.description,
-                    });
-                } else {
-                    // Recurse into nested objects
-                    result.push(...flattenTokens(val, newKey, currentType));
-                }
+                setPreviewFileName(file.name);
+                setPreviewFileContent(content);
+                setPreviewTokens(parsed);
+                setShowPreview(true);
+            } catch (err) {
+                console.error('[TokenManager] Parse error:', err);
+                alert(`Failed to parse ${file.name}: ${err instanceof Error ? err.message : 'Invalid JSON'}`);
             }
-        }
-        return result;
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files || files.length === 0 || !projectId || !userId) return;
-
-        // Process multiple files
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const reader = new FileReader();
-            
-            reader.onload = async (event) => {
-                try {
-                    const content = event.target?.result as string;
-                    const json = JSON.parse(content);
-                    const parsedTokens = flattenTokens(json);
-                    
-                    console.log(`[TokenManager] Parsed ${parsedTokens.length} tokens from ${file.name}:`, parsedTokens.slice(0, 5));
-                    
-                    if (parsedTokens.length === 0) {
-                        alert(`No tokens found in ${file.name}. Check the JSON structure.`);
-                        return;
-                    }
-                    
-                    // Create the file record first
-                    const fileId = await createFile({
-                        projectId,
-                        name: file.name.replace('.json', ''),
-                        originalName: file.name,
-                        content: content,
-                        tokenCount: parsedTokens.length,
-                        uploadedBy: userId,
-                    });
-                    
-                    console.log(`[TokenManager] Created file record:`, fileId);
-                    
-                    // Then import the tokens linked to this file
-                    await bulkImport({ 
-                        projectId,
-                        userId,
-                        tokens: parsedTokens,
-                        sourceFileId: fileId,
-                        clearExisting: false 
-                    });
-                    
-                    console.log(`[TokenManager] Tokens imported successfully`);
-                } catch (err) {
-                    console.error('[TokenManager] Upload error:', err);
-                    alert(`Error processing ${file.name}: ${err instanceof Error ? err.message : 'Invalid JSON'}`);
-                }
-            };
-            reader.readAsText(file);
-        }
+        };
+        reader.readAsText(file);
         
         // Reset file input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
+    };
+
+    // Confirm and import tokens from preview
+    const handleConfirmImport = async () => {
+        if (!projectId || !userId || previewTokens.length === 0) return;
+        
+        try {
+            // Create the file record first
+            const fileId = await createFile({
+                projectId,
+                name: previewFileName.replace('.json', ''),
+                originalName: previewFileName,
+                content: previewFileContent,
+                tokenCount: previewTokens.length,
+                uploadedBy: userId,
+            });
+            
+            // Then import the tokens linked to this file
+            await bulkImport({ 
+                projectId,
+                userId,
+                tokens: previewTokens,
+                sourceFileId: fileId,
+                clearExisting: false 
+            });
+            
+            // Close preview
+            setShowPreview(false);
+            setPreviewTokens([]);
+            setPreviewFileName('');
+            setPreviewFileContent('');
+        } catch (err) {
+            console.error('[TokenManager] Import error:', err);
+            alert(`Failed to import tokens: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+    };
+
+    // Update token type in preview
+    const updatePreviewTokenType = (index: number, newType: TokenType) => {
+        setPreviewTokens(prev => prev.map((t, i) => 
+            i === index ? { ...t, type: newType } : t
+        ));
     };
 
     const handleFileRename = async (fileId: Id<"tokenFiles">) => {
@@ -394,6 +484,13 @@ export const TokenManager: React.FC = () => {
         return `${days}d ago`;
     };
 
+    // Get token counts per type for tabs
+    const tokenCounts = (tokens || []).reduce((acc, t) => {
+        acc[t.type] = (acc[t.type] || 0) + 1;
+        acc.all = (acc.all || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
     return (
         <div className="flex h-full">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -407,8 +504,7 @@ export const TokenManager: React.FC = () => {
                             accept=".json" 
                             ref={fileInputRef} 
                             className="hidden" 
-                            onChange={handleFileUpload}
-                            multiple
+                            onChange={handleFileSelect}
                         />
                         
                         {/* Figma Import */}
@@ -423,7 +519,7 @@ export const TokenManager: React.FC = () => {
                         {/* Import JSON */}
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            title="Import JSON Files"
+                            title="Import JSON File"
                             className="p-1.5 text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
                         >
                             <Upload size={16} />
@@ -471,18 +567,27 @@ export const TokenManager: React.FC = () => {
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="flex gap-1 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900">
+                    <div className="flex gap-1 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 overflow-x-auto">
                         {TABS.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                                     activeTab === tab.id 
                                         ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white' 
                                         : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                                 }`}
                             >
                                 {tab.label}
+                                {tokenCounts[tab.id] > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                        activeTab === tab.id 
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                                    }`}>
+                                        {tokenCounts[tab.id]}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -492,7 +597,7 @@ export const TokenManager: React.FC = () => {
                             <div className="w-full py-12 text-center text-zinc-500 dark:text-zinc-400 text-sm border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
                                 {activeTab === 'all' 
                                     ? 'No tokens found. Upload a JSON file to get started.' 
-                                    : `No ${activeTab} tokens found. Check the "All" or "Other" tabs.`}
+                                    : `No ${activeTab} tokens found. Try the "All" tab to see all tokens.`}
                             </div>
                         )}
 
@@ -503,9 +608,9 @@ export const TokenManager: React.FC = () => {
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center gap-3">
                                                 {renderPreview(token)}
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-sm text-zinc-900 dark:text-white">{token.name}</span>
-                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[120px]" title={token.value}>{token.value}</span>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-medium text-sm text-zinc-900 dark:text-white truncate" title={token.name}>{token.name}</span>
+                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate" title={token.value}>{token.value}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -537,7 +642,7 @@ export const TokenManager: React.FC = () => {
                                     className="flex flex-col items-center justify-center p-4 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-500 dark:hover:border-zinc-500 transition-colors min-h-[100px]"
                                 >
                                     <Plus size={24} className="mb-2 opacity-50" />
-                                    <span className="text-xs font-medium">Add {activeTab}</span>
+                                    <span className="text-xs font-medium">Add Token</span>
                                 </button>
                             </div>
                         ) : (
@@ -548,6 +653,7 @@ export const TokenManager: React.FC = () => {
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400 w-16">Preview</th>
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400">Name</th>
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400">Value</th>
+                                            <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400">Type</th>
                                             <th className="px-4 py-3 font-medium text-zinc-500 dark:text-zinc-400 text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -558,7 +664,7 @@ export const TokenManager: React.FC = () => {
                                                     {renderPreview(token)}
                                                 </td>
                                                 <td className="px-4 py-2 font-medium text-zinc-900 dark:text-white">
-                                                    {token.name}
+                                                    <span className="truncate block max-w-[200px]" title={token.name}>{token.name}</span>
                                                 </td>
                                                 <td className="px-4 py-2 font-mono text-zinc-500 dark:text-zinc-400 text-xs">
                                                      {editingId === token._id ? (
@@ -570,7 +676,10 @@ export const TokenManager: React.FC = () => {
                                                             />
                                                             <button onClick={() => handleSave(token._id)} className="text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 p-1 rounded"><Save size={12}/></button>
                                                          </div>
-                                                     ) : token.value}
+                                                     ) : <span className="truncate block max-w-[150px]" title={token.value}>{token.value}</span>}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">{token.type}</span>
                                                 </td>
                                                 <td className="px-4 py-2 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <div className="flex justify-end gap-1">
@@ -732,12 +841,115 @@ export const TokenManager: React.FC = () => {
                 </div>
             )}
 
+            {/* Import Preview Modal */}
+            {showPreview && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-zinc-200/60 dark:border-zinc-800/60">
+                        <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                                    <Eye size={18} /> Preview Import
+                                </h3>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                    {previewFileName} · {previewTokens.length} tokens detected
+                                </p>
+                            </div>
+                            <button onClick={() => setShowPreview(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {previewTokens.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <AlertCircle size={32} className="mx-auto text-amber-500 mb-3" />
+                                    <p className="text-zinc-900 dark:text-white font-medium mb-1">No tokens found</p>
+                                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                        The JSON file doesn't contain any recognizable token values.
+                                    </p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead className="bg-zinc-50 dark:bg-zinc-800/50 sticky top-0">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Preview</th>
+                                            <th className="px-3 py-2 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Name</th>
+                                            <th className="px-3 py-2 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Value</th>
+                                            <th className="px-3 py-2 text-left font-medium text-zinc-500 dark:text-zinc-400 text-xs">Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                        {previewTokens.map((token, index) => (
+                                            <tr key={index} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                                <td className="px-3 py-2">
+                                                    {token.type === 'color' && isColorValue(token.value) ? (
+                                                        <div className="w-6 h-6 rounded border border-zinc-200 dark:border-zinc-700" style={{ backgroundColor: token.value }} />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[8px] text-zinc-400">
+                                                            {token.type.charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 font-mono text-xs text-zinc-900 dark:text-white">
+                                                    <span className="truncate block max-w-[200px]" title={token.name}>{token.name}</span>
+                                                </td>
+                                                <td className="px-3 py-2 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                                                    <span className="truncate block max-w-[150px]" title={token.value}>{token.value}</span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <select
+                                                        value={token.type}
+                                                        onChange={(e) => updatePreviewTokenType(index, e.target.value as TokenType)}
+                                                        className="text-[10px] px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                                                    >
+                                                        <option value="color">Color</option>
+                                                        <option value="typography">Typography</option>
+                                                        <option value="spacing">Spacing</option>
+                                                        <option value="sizing">Sizing</option>
+                                                        <option value="radius">Radius</option>
+                                                        <option value="shadow">Shadow</option>
+                                                        <option value="unknown">Other</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        
+                        <div className="p-4 border-t border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center">
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                {previewTokens.filter(t => t.type === 'color').length} colors, {' '}
+                                {previewTokens.filter(t => t.type === 'spacing').length} spacing, {' '}
+                                {previewTokens.filter(t => t.type === 'typography').length} typography
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="px-4 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmImport}
+                                    disabled={previewTokens.length === 0}
+                                    className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Import {previewTokens.length} Tokens
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Token Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-md p-6 border border-zinc-200/60 dark:border-zinc-800/60">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Add {activeTab} token</h3>
+                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Add Token</h3>
                             <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
                                 <X size={20} />
                             </button>
