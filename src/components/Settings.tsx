@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Moon, Sun, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -7,6 +7,27 @@ interface SettingsProps {
     theme: 'light' | 'dark';
     toggleTheme: () => void;
 }
+
+// Toggle Switch Component
+const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void; label?: string }> = ({ enabled, onChange, label }) => {
+    return (
+        <button
+            onClick={onChange}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:ring-offset-2 focus:ring-offset-transparent ${
+                enabled ? 'bg-violet-600' : 'bg-zinc-300 dark:bg-zinc-700'
+            }`}
+            role="switch"
+            aria-checked={enabled}
+            aria-label={label}
+        >
+            <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+            />
+        </button>
+    );
+};
 
 export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
     const [geminiKey, setGeminiKey] = useState('');
@@ -60,6 +81,8 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
         }
     };
 
+    const isDarkMode = theme === 'dark';
+
     return (
         <div className="flex flex-col h-full">
             <div className="p-6 border-b border-border flex justify-between items-center bg-background z-10">
@@ -76,23 +99,24 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center">
-                                    {theme === 'dark' ? <Moon size={20} className="text-primary" /> : <Sun size={20} className="text-primary" />}
+                                    {isDarkMode ? <Moon size={20} className="text-violet-500" /> : <Sun size={20} className="text-amber-500" />}
                                 </div>
                                 <div>
-                                    <h3 className="font-medium text-primary">Appearance</h3>
-                                    <p className="text-sm text-muted">Toggle between light and dark themes.</p>
+                                    <h3 className="font-medium text-primary">Dark Mode</h3>
+                                    <p className="text-sm text-muted">
+                                        {isDarkMode ? 'Dark theme is enabled' : 'Switch to dark theme'}
+                                    </p>
                                 </div>
                             </div>
-                            <button 
-                                onClick={handleThemeToggle}
-                                className="flex items-center gap-2 px-4 py-2 bg-background border border-border rounded-md text-sm font-medium hover:bg-surface transition-colors text-primary"
-                            >
-                                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-                            </button>
+                            <ToggleSwitch 
+                                enabled={isDarkMode} 
+                                onChange={handleThemeToggle}
+                                label="Toggle dark mode"
+                            />
                         </div>
                     </div>
 
-                    {/* Figma PAT - NEW */}
+                    {/* Figma PAT */}
                     <div className="bg-[#fafafa] dark:bg-[#18181b] border border-border rounded-lg p-6">
                         <div className="flex items-start gap-4">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] flex items-center justify-center flex-shrink-0">
@@ -132,7 +156,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                     <button
                                         onClick={handleSaveFigmaPat}
                                         disabled={!figmaPat.trim() || isFigmaSaving}
-                                        className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
+                                        className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
                                     >
                                         {isFigmaSaving ? (
                                             <Loader2 size={14} className="animate-spin" />
@@ -148,7 +172,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                         href="https://www.figma.com/developers/api#access-tokens" 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                                        className="inline-flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:underline"
                                     >
                                         Get your Personal Access Token <ExternalLink size={12} />
                                     </a>
@@ -199,7 +223,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                     <button
                                         onClick={handleSaveGeminiKey}
                                         disabled={!geminiKey.trim() || isGeminiSaving}
-                                        className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-md hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
+                                        className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
                                     >
                                         {isGeminiSaving ? (
                                             <Loader2 size={14} className="animate-spin" />
@@ -214,7 +238,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
                                     href="https://aistudio.google.com/apikey" 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline mt-2"
+                                    className="inline-flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:underline mt-2"
                                 >
                                     Get API key from Google AI Studio <ExternalLink size={12} />
                                 </a>
@@ -314,4 +338,3 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
         </div>
     );
 };
-
