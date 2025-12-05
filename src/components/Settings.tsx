@@ -10,7 +10,7 @@ interface SettingsProps {
     onThemeModeChange: (mode: ThemeMode) => void;
 }
 
-// Theme Switcher Component
+// Theme Switcher Component (Icon only)
 const ThemeSwitcher: React.FC<{
     value: ThemeMode;
     onChange: (mode: ThemeMode) => void;
@@ -24,22 +24,20 @@ const ThemeSwitcher: React.FC<{
 
     return (
         <div className="flex flex-col gap-3">
-            {/* Segmented Control */}
-            <div className="inline-flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+            {/* Icon-only Segmented Control */}
+            <div className="inline-flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg w-fit">
                 {options.map((option) => (
                     <button
                         key={option.mode}
                         onClick={() => onChange(option.mode)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        title={option.label}
+                        className={`flex items-center justify-center w-9 h-8 rounded-md transition-all duration-200 ${
                             value === option.mode
-                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
-                                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                                ? 'bg-white dark:bg-zinc-700 shadow-sm text-violet-600 dark:text-violet-400'
+                                : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
                         }`}
                     >
-                        <span className={value === option.mode ? 'text-violet-600 dark:text-violet-400' : ''}>
-                            {option.icon}
-                        </span>
-                        {option.label}
+                        {option.icon}
                     </button>
                 ))}
             </div>
@@ -48,7 +46,7 @@ const ThemeSwitcher: React.FC<{
             {value === 'system' && (
                 <p className="text-xs text-muted flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                    Currently using {resolvedTheme} theme based on system preference
+                    Using {resolvedTheme} mode (system)
                 </p>
             )}
         </div>
