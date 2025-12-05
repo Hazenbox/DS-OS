@@ -608,7 +608,7 @@ export const TokenManager: React.FC = () => {
     return (
         <div className="flex h-full">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 z-10">
+                <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 z-10 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Tokens</h2>
                     <input 
                         type="file" 
@@ -617,43 +617,39 @@ export const TokenManager: React.FC = () => {
                         className="hidden" 
                         onChange={handleFileSelect}
                     />
+                    <button 
+                        onClick={() => setShowExportModal(true)}
+                        title="Export Tokens"
+                        className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                    >
+                        <Download size={16} />
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="flex items-center px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 overflow-x-auto">
-                        <div className="flex gap-0.5">
-                            {TABS.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    <div className="flex gap-0.5 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 overflow-x-auto">
+                        {TABS.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b transition-colors whitespace-nowrap ${
+                                    activeTab === tab.id 
+                                        ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white' 
+                                        : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                                }`}
+                            >
+                                {tab.label}
+                                {tokenCounts[tab.id] > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                                         activeTab === tab.id 
-                                            ? 'border-zinc-900 dark:border-white text-zinc-900 dark:text-white' 
-                                            : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                                    }`}
-                                >
-                                    {tab.label}
-                                    {tokenCounts[tab.id] > 0 && (
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                            activeTab === tab.id 
-                                                ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
-                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                                        }`}>
-                                            {tokenCounts[tab.id]}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                        
-                        {/* Export - 24px gap from tabs */}
-                        <button 
-                            onClick={() => setShowExportModal(true)}
-                            title="Export Tokens"
-                            className="ml-6 p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-                        >
-                            <Download size={14} />
-                        </button>
+                                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' 
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                                    }`}>
+                                        {tokenCounts[tab.id]}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6">
