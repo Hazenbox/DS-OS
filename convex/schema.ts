@@ -297,11 +297,32 @@ export default defineSchema({
     updatedAt: v.number(),
     userId: v.optional(v.string()), // Owner's email (legacy)
     createdBy: v.optional(v.string()), // Legacy field for backward compatibility
+    ownerId: v.optional(v.id("users")), // Project owner (for member management)
   })
     .index("by_tenant", ["tenantId"])
     .index("by_user", ["userId"])
     .index("by_tenant_active", ["tenantId", "isActive"])
     .index("by_user_active", ["userId", "isActive"]),
+
+  // Project Members - Users with access to specific projects
+  projectMembers: defineTable({
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"), // For efficient tenant-scoped queries
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("owner"),
+      v.literal("admin"),
+      v.literal("editor"),
+      v.literal("viewer")
+    ),
+    addedBy: v.id("users"),
+    addedAt: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_tenant_project", ["tenantId", "projectId"])
+    .index("by_user", ["userId"])
+    .index("by_project_user", ["projectId", "userId"]),
 
   // Users
   users: defineTable({

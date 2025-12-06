@@ -78,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
 
   const navItems: { id: ViewState; label: string }[] = [
     { id: 'dashboard', label: 'Overview' },
+    { id: 'projects', label: 'Projects' },
     { id: 'tokens', label: 'Tokens' },
     { id: 'builder', label: 'Builder' },
     { id: 'documentation', label: 'Documentation' },

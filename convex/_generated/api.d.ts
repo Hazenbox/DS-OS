@@ -18,6 +18,7 @@ import type * as github from "../github.js";
 import type * as migrations_clearAllData from "../migrations/clearAllData.js";
 import type * as migrations_fixOrphanedRecords from "../migrations/fixOrphanedRecords.js";
 import type * as migrations_tenantMigration from "../migrations/tenantMigration.js";
+import type * as projectMembers from "../projectMembers.js";
 import type * as projects from "../projects.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as releases from "../releases.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/clearAllData": typeof migrations_clearAllData;
   "migrations/fixOrphanedRecords": typeof migrations_fixOrphanedRecords;
   "migrations/tenantMigration": typeof migrations_tenantMigration;
+  projectMembers: typeof projectMembers;
   projects: typeof projects;
   rateLimit: typeof rateLimit;
   releases: typeof releases;

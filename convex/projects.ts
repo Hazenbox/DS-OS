@@ -153,10 +153,22 @@ export const create = mutation({
       tenantId: args.tenantId,
       name,
       description: args.description?.trim(),
+      ownerId: args.userId, // Set creator as owner
       isActive: true, // New project is always active
       createdAt: now,
       updatedAt: now,
       userId: userEmail, // Keep for backward compatibility
+    });
+
+    // Add creator as project owner
+    await ctx.db.insert("projectMembers", {
+      projectId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+      role: "owner",
+      addedBy: args.userId,
+      addedAt: now,
+      isActive: true,
     });
     
     // Log activity

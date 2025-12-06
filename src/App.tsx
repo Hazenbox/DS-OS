@@ -5,6 +5,7 @@ import { TokenManager } from './components/TokenManager';
 import { ComponentBuilder } from './components/ComponentBuilder';
 import { ReleaseManager } from './components/ReleaseManager';
 import { Settings } from './components/Settings';
+import { ProjectManagement } from './components/ProjectManagement';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
@@ -35,6 +36,7 @@ const pathToView: Record<string, ViewState> = {
   '/settings': 'settings',
   '/documentation': 'documentation',
   '/feedback': 'feedback',
+  '/projects': 'projects',
 };
 
 const viewToPath: Record<ViewState, string> = {
@@ -45,6 +47,7 @@ const viewToPath: Record<ViewState, string> = {
   'settings': '/settings',
   'documentation': '/documentation',
   'feedback': '/feedback',
+  'projects': '/projects',
 };
 
 // Get initial view from URL
@@ -176,6 +179,8 @@ const AppContent: React.FC<{
         return <ReleaseManager />;
       case 'settings':
         return <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />;
+      case 'projects':
+        return <ProjectManagement />;
       case 'documentation':
         return (
           <div className="flex flex-col h-full">
