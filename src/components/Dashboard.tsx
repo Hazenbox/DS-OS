@@ -4,6 +4,7 @@ import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
 import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Plus, Edit2, Trash2, Download, Upload, Rocket } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { useTenant } from '../contexts/TenantContext';
 import { CardSkeleton, TimelineSkeleton } from './LoadingSpinner';
 
 // Action icons and colors
@@ -133,10 +134,32 @@ export const Dashboard: React.FC = () => {
   const [activityFilter, setActivityFilter] = useState<string>('all');
   
   // Get real data from Convex - scoped to project
-  const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
-  const convexComponents = useQuery(api.components.list, projectId ? { projectId } : "skip");
-  const convexActivity = useQuery(api.activity.list, projectId ? { projectId, limit: 50 } : "skip");
-  const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
+  const { tenantId, userId } = useTenant();
+  
+  const convexTokens = useQuery(
+    api.tokens.list, 
+    projectId && tenantId && userId 
+      ? { projectId, tenantId, userId } 
+      : "skip"
+  );
+  const convexComponents = useQuery(
+    api.components.list, 
+    projectId && tenantId && userId 
+      ? { projectId, tenantId, userId } 
+      : "skip"
+  );
+  const convexActivity = useQuery(
+    api.activity.list, 
+    projectId && tenantId && userId 
+      ? { projectId, tenantId, userId, limit: 50 } 
+      : "skip"
+  );
+  const latestRelease = useQuery(
+    api.releases.latest, 
+    projectId && tenantId && userId 
+      ? { projectId, tenantId, userId } 
+      : "skip"
+  );
 
   // Loading states
   const isLoadingStats = (convexTokens === undefined || convexComponents === undefined) && projectId;
