@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
@@ -106,7 +106,7 @@ const ActivityItem: React.FC<{
         <div className="absolute left-[9px] top-7 w-px h-[calc(100%-4px)] bg-zinc-200 dark:bg-zinc-700/50" />
       )}
       
-      <div className="flex gap-3 p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer">
+      <div className="flex gap-3 p-2 rounded-lg">
         {/* Timeline dot with icon */}
         <div className={`w-[18px] h-[18px] rounded-full ${actionConfig.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ring-2 ring-white dark:ring-zinc-900`}>
           <span className={actionConfig.color}>{actionConfig.icon}</span>
@@ -133,7 +133,7 @@ export const Dashboard: React.FC = () => {
   const { projectId } = useProject();
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const filterMenuRef = React.useRef<HTMLDivElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
   
   // Get real data from Convex - scoped to project
   const { tenantId, userId } = useTenant();
@@ -305,18 +305,14 @@ export const Dashboard: React.FC = () => {
       {/* Activity Side Panel */}
       <div className="w-80 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col h-full">
         {/* Panel Header */}
-        <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
+        <div className="py-[22px] px-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock size={16} className="text-zinc-400" />
               <h3 className="font-semibold text-sm text-zinc-900 dark:text-white">Activity</h3>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-                {filteredActivity.length}
-              </span>
-              {/* Filter Button */}
-              <div className="relative" ref={filterMenuRef}>
+            {/* Filter Button */}
+            <div className="relative" ref={filterMenuRef}>
                 <button
                   onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
                   className={`h-8 w-8 flex items-center justify-center rounded-md transition-colors ${
