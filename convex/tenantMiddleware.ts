@@ -102,7 +102,7 @@ export async function requireRole(
  * Verify tenant access to a resource
  * Ensures the resource belongs to the tenant
  */
-export async function verifyTenantResource<T extends { tenantId?: Id<"tenants"> }>(
+export async function verifyTenantResource<T extends { tenantId: Id<"tenants"> }>(
   ctx: any,
   tenantId: Id<"tenants">,
   resource: T | null
@@ -111,13 +111,7 @@ export async function verifyTenantResource<T extends { tenantId?: Id<"tenants"> 
     throw new Error("Resource not found");
   }
 
-  // If resource doesn't have tenantId yet (migration pending), allow access
-  // This is temporary until migration is complete
-  if (!resource.tenantId) {
-    console.warn("Resource missing tenantId - migration may be needed");
-    return resource;
-  }
-
+  // tenantId is now required - migration complete
   if (resource.tenantId !== tenantId) {
     throw new Error("Access denied: Resource does not belong to this tenant");
   }
