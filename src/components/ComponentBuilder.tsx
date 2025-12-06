@@ -747,24 +747,37 @@ export const ComponentBuilder: React.FC = () => {
   // Only show warning if keys have been checked and are missing
   const showApiKeyWarning = !isApiKeysLoading && !canExtract;
   
-  // Validate Figma URL
-  const isValidFigmaUrl = React.useMemo(() => {
-    if (!figmaUrl.trim()) return false;
+  // Validate Figma URL and return error message if invalid
+  const figmaUrlValidation = React.useMemo((): { isValid: boolean; error: string | null } => {
+    if (!figmaUrl.trim()) return { isValid: false, error: null }; // Empty is not an error, just not valid
+    
     try {
       const url = new URL(figmaUrl);
+      
       // Must be figma.com domain
-      if (!url.hostname.includes('figma.com')) return false;
+      if (!url.hostname.includes('figma.com')) {
+        return { isValid: false, error: 'URL must be from figma.com' };
+      }
+      
       // Must have /file/ or /design/ in path
-      if (!url.pathname.includes('/file/') && !url.pathname.includes('/design/')) return false;
+      if (!url.pathname.includes('/file/') && !url.pathname.includes('/design/')) {
+        return { isValid: false, error: 'URL must contain a Figma file or design link' };
+      }
+      
       // Must have a file key (alphanumeric string after /file/ or /design/)
       const pathParts = url.pathname.split('/');
       const fileIndex = pathParts.indexOf('file') !== -1 ? pathParts.indexOf('file') : pathParts.indexOf('design');
-      if (fileIndex === -1 || !pathParts[fileIndex + 1]) return false;
-      return true;
+      if (fileIndex === -1 || !pathParts[fileIndex + 1]) {
+        return { isValid: false, error: 'Could not find file key in URL' };
+      }
+      
+      return { isValid: true, error: null };
     } catch {
-      return false;
+      return { isValid: false, error: 'Invalid URL format' };
     }
   }, [figmaUrl]);
+  
+  const isValidFigmaUrl = figmaUrlValidation.isValid;
   
   // Convex mutations & actions
   const createComponent = useMutation(api.components.create);
@@ -876,8 +889,19 @@ export const ComponentBuilder: React.FC = () => {
             onChange={(e) => setFigmaUrl(e.target.value)}
             placeholder={isApiKeysLoading ? "Checking API keys..." : "Paste Figma component URL..."}
             disabled={isApiKeysLoading || !canExtract || isExtracting}
-            className="w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-2 disabled:opacity-50"
+            className={`w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 disabled:opacity-50 ${
+              figmaUrlValidation.error 
+                ? 'border-red-300 dark:border-red-500/50 focus:ring-red-500/50' 
+                : 'border-zinc-200/60 dark:border-zinc-700/60 focus:ring-violet-500/50'
+            }`}
           />
+          {figmaUrlValidation.error && (
+            <p className="text-[10px] text-red-500 dark:text-red-400 mt-1 mb-2 flex items-center gap-1">
+              <AlertCircle size={10} />
+              {figmaUrlValidation.error}
+            </p>
+          )}
+          {!figmaUrlValidation.error && <div className="mb-2" />}
           <button
             onClick={handleExtract}
             disabled={!isValidFigmaUrl || isApiKeysLoading || !canExtract || isExtracting}
