@@ -387,10 +387,28 @@ Return ONLY valid JSON with this structure (no markdown, no explanation):
 export const extractAndBuildComponent = action({
   args: {
     projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     figmaUrl: v.string(),
   },
   handler: async (ctx, args): Promise<ExtractedComponent> => {
+    // Verify tenant access
+    await ctx.runQuery(api.tenants.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
+    // Verify project belongs to tenant
+    const project = await ctx.runQuery(api.projects.get, {
+      id: args.projectId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
+    if (!project) {
+      throw new Error('Project not found or access denied');
+    }
+    
     // Parse Figma URL
     const urlMatch = args.figmaUrl.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
     if (!urlMatch) {
@@ -406,14 +424,16 @@ export const extractAndBuildComponent = action({
       throw new Error('No node ID found in URL. Please select a specific component.');
     }
     
-    // Get API keys from settings
+    // Get API keys from settings (now tenant-scoped)
     // Figma PAT is stored with key 'figma_pat' (set via api.figma.setFigmaPat)
     const figmaPat = await ctx.runQuery(api.settings.get, { 
+      tenantId: args.tenantId,
       userId: args.userId, 
       key: 'figma_pat' 
     });
     
     const claudeApiKey = await ctx.runQuery(api.settings.get, { 
+      tenantId: args.tenantId,
       userId: args.userId, 
       key: 'claudeApiKey' 
     });
@@ -487,15 +507,24 @@ export const extractAndBuildComponent = action({
 
 export const getApiKeyStatus = action({
   args: {
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args): Promise<{ hasFigmaPat: boolean; hasClaudeApiKey: boolean }> => {
+    // Verify tenant access
+    await ctx.runQuery(api.tenants.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
     const figmaPat: string | null = await ctx.runQuery(api.settings.get, { 
+      tenantId: args.tenantId,
       userId: args.userId, 
       key: 'figma_pat' 
     });
     
     const claudeApiKey: string | null = await ctx.runQuery(api.settings.get, { 
+      tenantId: args.tenantId,
       userId: args.userId, 
       key: 'claudeApiKey' 
     });
