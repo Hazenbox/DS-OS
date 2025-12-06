@@ -218,7 +218,7 @@ export default defineSchema({
 
   // Activity Log - scoped to project
   activity: defineTable({
-    tenantId: v.id("tenants"), // Required - migration complete
+    tenantId: v.optional(v.id("tenants")), // Temporarily optional to fix orphaned record
     projectId: v.optional(v.id("projects")), // Optional for system-wide activity
     user: v.string(),
     action: v.union(

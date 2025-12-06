@@ -120,3 +120,58 @@ export const cleanup = mutation({
     return 0;
   },
 });
+
+// ============================================================================
+// FIX ORPHANED ACTIVITIES - Migration helper
+// ============================================================================
+
+/**
+ * Fix orphaned activities (activities without tenantId)
+ * Associates them with their project's tenant, or deletes system activities
+ */
+export const fixOrphanedActivities = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const results = {
+      fixed: 0,
+      deleted: 0,
+      errors: [] as string[],
+    };
+
+    try {
+      // Find all activities without tenantId
+      const orphanedActivities = await ctx.db
+        .query("activity")
+        .filter((q) => q.eq(q.field("tenantId"), undefined))
+        .collect();
+
+      for (const activity of orphanedActivities) {
+        try {
+          // Try to find tenant from project
+          if (activity.projectId) {
+            const project = await ctx.db.get(activity.projectId);
+            if (project?.tenantId) {
+              await ctx.db.patch(activity._id, { tenantId: project.tenantId });
+              results.fixed++;
+              continue;
+            }
+          }
+
+          // If no project or project has no tenant, delete the orphaned activity
+          // (these are likely old system activities that can't be associated)
+          await ctx.db.delete(activity._id);
+          results.deleted++;
+        } catch (error: any) {
+          results.errors.push(`Error fixing activity ${activity._id}: ${error.message}`);
+        }
+      }
+    } catch (error: any) {
+      results.errors.push(error.message || String(error));
+    }
+
+    return {
+      ...results,
+      message: `Fixed ${results.fixed} activities, deleted ${results.deleted} orphaned activities`,
+    };
+  },
+});
