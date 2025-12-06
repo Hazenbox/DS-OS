@@ -261,6 +261,22 @@ export const migrate = mutation({
             }
             results.settingsMigrated++;
           }
+
+          // Migrate figmaExtractions (if any exist for projects)
+          for (const project of projects) {
+            const figmaExtractions = await ctx.db
+              .query("figmaExtractions")
+              .withIndex("by_project", (q) => q.eq("projectId", project._id))
+              .collect();
+            for (const extraction of figmaExtractions) {
+              if (!dryRunMode) {
+                await ctx.db.patch(extraction._id, {
+                  tenantId,
+                });
+              }
+              // Count in a separate field if needed, or add to activities
+            }
+          }
         } catch (error: any) {
           results.errors.push(`Error migrating user ${user.email}: ${error.message || String(error)}`);
         }
