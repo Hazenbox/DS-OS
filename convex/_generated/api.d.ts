@@ -15,6 +15,7 @@ import type * as components_ from "../components.js";
 import type * as figma from "../figma.js";
 import type * as figmaExtraction from "../figmaExtraction.js";
 import type * as github from "../github.js";
+import type * as migrations_clearAllData from "../migrations/clearAllData.js";
 import type * as migrations_fixOrphanedRecords from "../migrations/fixOrphanedRecords.js";
 import type * as migrations_tenantMigration from "../migrations/tenantMigration.js";
 import type * as projects from "../projects.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   figma: typeof figma;
   figmaExtraction: typeof figmaExtraction;
   github: typeof github;
+  "migrations/clearAllData": typeof migrations_clearAllData;
   "migrations/fixOrphanedRecords": typeof migrations_fixOrphanedRecords;
   "migrations/tenantMigration": typeof migrations_tenantMigration;
   projects: typeof projects;
