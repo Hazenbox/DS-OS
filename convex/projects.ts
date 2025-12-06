@@ -1,21 +1,25 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
 
 // ============================================================================
-// HELPER: Verify project ownership
+// HELPER: Verify project access (tenant-aware)
 // ============================================================================
-async function verifyProjectOwnership(
-  ctx: any, 
-  projectId: any, 
-  userId: string
+async function verifyProjectAccess(
+  ctx: any,
+  projectId: Id<"projects">,
+  tenantId: Id<"tenants">,
+  userId: Id<"users">
 ): Promise<any> {
   const project = await ctx.db.get(projectId);
   if (!project) {
     throw new Error("Project not found");
   }
-  if (project.userId !== userId) {
-    throw new Error("Access denied: You don't own this project");
-  }
+  
+  // Verify tenant access
+  verifyTenantResource(ctx, tenantId, project);
+  
   return project;
 }
 
@@ -23,53 +27,63 @@ async function verifyProjectOwnership(
 // QUERIES
 // ============================================================================
 
-// Get all projects for a user (using index!)
+// Get all projects for a tenant
 export const list = query({
   args: {
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (!args.userId) {
-      return [];
-    }
-    // Use the index for efficient filtering
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
+    // Use tenant index for efficient filtering
     return await ctx.db
       .query("projects")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
       .collect();
   },
 });
 
-// Get active project for a user (using index!)
+// Get active project for a tenant
 export const getActive = query({
   args: {
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    if (!args.userId) {
-      return null;
-    }
-    // Use the composite index for efficient lookup
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
+    // Use tenant index for efficient lookup
     return await ctx.db
       .query("projects")
-      .withIndex("by_user_active", (q) => 
-        q.eq("userId", args.userId).eq("isActive", true)
+      .withIndex("by_tenant_active", (q) => 
+        q.eq("tenantId", args.tenantId).eq("isActive", true)
       )
       .first();
   },
 });
 
-// Get a single project by ID (with ownership check)
+// Get a single project by ID (with tenant access check)
 export const get = query({
   args: {
     id: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const project = await ctx.db.get(args.id);
-    if (!project || project.userId !== args.userId) {
+    if (!project) {
       return null;
     }
+    
+    // Verify tenant access to project
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     return project;
   },
 });
@@ -78,14 +92,36 @@ export const get = query({
 // MUTATIONS
 // ============================================================================
 
-// Create a new project for a user
+// Create a new project for a tenant
 export const create = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access and check quota
+    const context = await getTenantContext(ctx, args.userId, args.tenantId);
+    
+    // Check quota (require developer role to create)
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
+    // Check quota
+    const quota = await ctx.db
+      .query("tenantQuotas")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .first();
+    
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .collect();
+    
+    if (quota?.maxProjects && projects.length >= quota.maxProjects) {
+      throw new Error(`Project limit reached. Maximum ${quota.maxProjects} projects allowed.`);
+    }
+    
     // Input validation
     const name = args.name.trim();
     if (!name || name.length < 2) {
@@ -97,11 +133,11 @@ export const create = mutation({
     
     const now = Date.now();
     
-    // Deactivate any existing active projects for this user
+    // Deactivate any existing active projects for this tenant
     const activeProject = await ctx.db
       .query("projects")
-      .withIndex("by_user_active", (q) => 
-        q.eq("userId", args.userId).eq("isActive", true)
+      .withIndex("by_tenant_active", (q) => 
+        q.eq("tenantId", args.tenantId).eq("isActive", true)
       )
       .first();
     
@@ -109,19 +145,25 @@ export const create = mutation({
       await ctx.db.patch(activeProject._id, { isActive: false });
     }
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     const projectId = await ctx.db.insert("projects", {
+      tenantId: args.tenantId,
       name,
       description: args.description?.trim(),
       isActive: true, // New project is always active
       createdAt: now,
       updatedAt: now,
-      userId: args.userId,
+      userId: userEmail, // Keep for backward compatibility
     });
     
-    // Log activity with actual user
+    // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId,
-      user: args.userId,
+      user: userEmail,
       action: "create",
       target: `Project: ${name}`,
       targetType: "system",
@@ -131,21 +173,25 @@ export const create = mutation({
   },
 });
 
-// Set active project for a user
+// Set active project for a tenant
 export const setActive = mutation({
   args: { 
     id: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify ownership
-    await verifyProjectOwnership(ctx, args.id, args.userId);
+    // Verify tenant access
+    const context = await getTenantContext(ctx, args.userId, args.tenantId);
     
-    // Deactivate current active project
+    // Verify project access
+    await verifyProjectAccess(ctx, args.id, args.tenantId, args.userId);
+    
+    // Deactivate current active project for this tenant
     const currentActive = await ctx.db
       .query("projects")
-      .withIndex("by_user_active", (q) => 
-        q.eq("userId", args.userId).eq("isActive", true)
+      .withIndex("by_tenant_active", (q) => 
+        q.eq("tenantId", args.tenantId).eq("isActive", true)
       )
       .first();
     
@@ -160,19 +206,24 @@ export const setActive = mutation({
   },
 });
 
-// Update project (only if user owns it)
+// Update project (tenant-aware)
 export const update = mutation({
   args: {
     id: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, userId, ...updates } = args;
+    const { id, tenantId, userId, ...updates } = args;
     
-    // Verify ownership
-    await verifyProjectOwnership(ctx, id, userId);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
+    
+    // Verify project access
+    await verifyProjectAccess(ctx, id, tenantId, userId);
     
     // Validate name if provided
     if (updates.name !== undefined) {
@@ -199,21 +250,28 @@ export const update = mutation({
   },
 });
 
-// Delete project (only if user owns it)
+// Delete project (tenant-aware, requires admin role)
 export const remove = mutation({
   args: { 
     id: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify ownership
-    const project = await verifyProjectOwnership(ctx, args.id, args.userId);
+    // Verify tenant access and require admin role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "admin");
+    
+    // Verify project access
+    const project = await verifyProjectAccess(ctx, args.id, args.tenantId, args.userId);
     
     // Delete all associated data first (cascade delete)
     // Tokens
     const tokens = await ctx.db
       .query("tokens")
-      .withIndex("by_project", (q) => q.eq("projectId", args.id))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.id)
+      )
       .collect();
     for (const token of tokens) {
       await ctx.db.delete(token._id);
@@ -222,16 +280,31 @@ export const remove = mutation({
     // Components
     const components = await ctx.db
       .query("components")
-      .withIndex("by_project", (q) => q.eq("projectId", args.id))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.id)
+      )
       .collect();
     for (const component of components) {
       await ctx.db.delete(component._id);
     }
     
+    // Token Files
+    const tokenFiles = await ctx.db
+      .query("tokenFiles")
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.id)
+      )
+      .collect();
+    for (const tokenFile of tokenFiles) {
+      await ctx.db.delete(tokenFile._id);
+    }
+    
     // Releases
     const releases = await ctx.db
       .query("releases")
-      .withIndex("by_project", (q) => q.eq("projectId", args.id))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.id)
+      )
       .collect();
     for (const release of releases) {
       await ctx.db.delete(release._id);
@@ -240,7 +313,9 @@ export const remove = mutation({
     // Activity
     const activities = await ctx.db
       .query("activity")
-      .withIndex("by_project", (q) => q.eq("projectId", args.id))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.id)
+      )
       .collect();
     for (const activity of activities) {
       await ctx.db.delete(activity._id);
@@ -249,11 +324,11 @@ export const remove = mutation({
     // Delete the project
     await ctx.db.delete(args.id);
     
-    // If we deleted the active project, activate another one
+    // If we deleted the active project, activate another one for this tenant
     if (project.isActive) {
       const remaining = await ctx.db
         .query("projects")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
         .first();
       
       if (remaining) {
@@ -265,18 +340,22 @@ export const remove = mutation({
   },
 });
 
-// Migration: Assign orphan projects to a user (admin only)
+// Migration: Assign orphan projects to a tenant (admin only)
+// This is a migration helper - should not be used in normal operations
 export const migrateOrphanProjects = mutation({
   args: {
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // In production, add admin check here
+    // Verify admin access
+    await requireRole(ctx, args.tenantId, args.userId, "admin");
+    
     const allProjects = await ctx.db.query("projects").collect();
-    const orphans = allProjects.filter(p => !p.userId);
+    const orphans = allProjects.filter(p => !p.tenantId);
     
     for (const project of orphans) {
-      await ctx.db.patch(project._id, { userId: args.userId });
+      await ctx.db.patch(project._id, { tenantId: args.tenantId });
     }
     
     return { migrated: orphans.length };
