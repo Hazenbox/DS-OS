@@ -738,9 +738,14 @@ export const ComponentBuilder: React.FC = () => {
   const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
   
   const isLoading = components === undefined && projectId;
+  
+  // API key status - check if still loading vs actually missing
+  const isApiKeysLoading = userId && (figmaPatStatus === undefined || apiKeyStatus === undefined);
   const hasFigmaPat = figmaPatStatus?.configured || false;
   const hasClaudeKey = !!apiKeyStatus;
   const canExtract = hasFigmaPat && hasClaudeKey;
+  // Only show warning if keys have been checked and are missing
+  const showApiKeyWarning = !isApiKeysLoading && !canExtract;
   
   // Convex mutations & actions
   const createComponent = useMutation(api.components.create);
@@ -834,8 +839,8 @@ export const ComponentBuilder: React.FC = () => {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Figma → React with Claude AI</p>
         </div>
         
-        {/* API Key Status */}
-        {!canExtract && (
+        {/* API Key Status - only show if checked and missing */}
+        {showApiKeyWarning && (
           <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
             <ApiKeySetup hasFigmaPat={hasFigmaPat} hasClaudeKey={hasClaudeKey} />
           </div>
@@ -851,13 +856,13 @@ export const ComponentBuilder: React.FC = () => {
             type="text"
             value={figmaUrl}
             onChange={(e) => setFigmaUrl(e.target.value)}
-            placeholder="Paste Figma component URL..."
-            disabled={!canExtract || isExtracting}
+            placeholder={isApiKeysLoading ? "Checking API keys..." : "Paste Figma component URL..."}
+            disabled={isApiKeysLoading || !canExtract || isExtracting}
             className="w-full h-8 px-3 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/60 rounded-lg text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-2 disabled:opacity-50"
           />
           <button
             onClick={handleExtract}
-            disabled={!figmaUrl.trim() || !canExtract || isExtracting}
+            disabled={!figmaUrl.trim() || isApiKeysLoading || !canExtract || isExtracting}
             className="w-full h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
             {isExtracting ? (
@@ -1160,7 +1165,12 @@ export const ComponentBuilder: React.FC = () => {
                 <span>Variants</span>
               </div>
             </div>
-            {!canExtract && (
+            {isApiKeysLoading ? (
+              <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+                <Loader2 size={12} className="animate-spin" />
+                Checking API keys...
+              </p>
+            ) : !canExtract && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
                 Configure your API keys in Settings to get started
               </p>
