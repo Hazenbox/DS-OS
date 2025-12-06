@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, query, mutation } from "./_generated/server";
 import { api } from "./_generated/api";
+import { getTenantContext } from "./tenantMiddleware";
 
 // ============================================================================
 // FIGMA API TYPES
@@ -568,7 +569,6 @@ export const setFigmaPat = mutation({
   },
   handler: async (ctx, args) => {
     // Verify tenant access
-    const { getTenantContext } = await import("./tenantMiddleware");
     await getTenantContext(ctx, args.userId, args.tenantId);
     
     const existing = await ctx.db
@@ -601,7 +601,6 @@ export const getFigmaPatStatus = query({
   },
   handler: async (ctx, args) => {
     // Verify tenant access
-    const { getTenantContext } = await import("./tenantMiddleware");
     await getTenantContext(ctx, args.userId, args.tenantId);
     
     const setting = await ctx.db
