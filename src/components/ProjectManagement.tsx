@@ -110,7 +110,7 @@ export const ProjectManagement: React.FC<ProjectManagementProps> = ({ onProjectS
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-screen w-full flex flex-col bg-white dark:bg-zinc-900">
       {/* Header */}
       <div className="px-8 pt-8 pb-6 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center justify-between">

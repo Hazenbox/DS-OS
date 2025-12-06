@@ -78,7 +78,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
 
   const navItems: { id: ViewState; label: string }[] = [
     { id: 'dashboard', label: 'Overview' },
-    { id: 'projects', label: 'Projects' },
     { id: 'tokens', label: 'Tokens' },
     { id: 'builder', label: 'Builder' },
     { id: 'documentation', label: 'Documentation' },
@@ -141,12 +140,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
               <button 
                 onClick={() => {
                   setIsProjectMenuOpen(false);
+                  onChangeView('projects');
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
+              >
+                <FolderOpen size={14} /> View All Projects
+              </button>
+              
+              <button 
+                onClick={() => {
+                  setIsProjectMenuOpen(false);
                   onOpenProjectModal();
                 }}
                 className="w-full text-left px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 transition-all duration-200 ease-in-out"
               >
-                        <Plus size={14} /> Create Project
-                    </button>
+                <Plus size={14} /> Create Project
+              </button>
                 </div>
             )}
         </div>

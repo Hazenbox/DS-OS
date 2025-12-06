@@ -141,11 +141,8 @@ const AppContent: React.FC<{
     }
     
     // Show "no project" state if no active project (but allow projects and settings views)
+    // Redirect is handled by useEffect above
     if (!projectId && !isProjectLoading && tenantId && currentView !== 'projects' && currentView !== 'settings') {
-      // Redirect to projects page if no project is selected
-      useEffect(() => {
-        handleViewChange('projects');
-      }, []);
       return null;
     }
 
@@ -204,23 +201,34 @@ const AppContent: React.FC<{
     }
   };
 
+  // Determine if we should show sidebar (only when inside a project workspace)
+  const showSidebar = projectId && currentView !== 'projects';
+
   return (
     <>
-      <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
-        <Sidebar 
-          currentView={currentView} 
-          onChangeView={handleViewChange} 
-          user={user} 
-          onLogout={onLogout}
-          onOpenProjectModal={() => setShowProjectModal(true)}
-        />
-        
-        <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
-          <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
-            {renderView()}
-          </main>
+      {showSidebar ? (
+        // Project Workspace Layout (with sidebar)
+        <div className="flex h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
+          <Sidebar 
+            currentView={currentView} 
+            onChangeView={handleViewChange} 
+            user={user} 
+            onLogout={onLogout}
+            onOpenProjectModal={() => setShowProjectModal(true)}
+          />
+          
+          <div className="flex-1 h-full p-[10px] overflow-hidden flex flex-col">
+            <main className="flex-1 h-full w-full rounded-[12px] bg-white dark:bg-zinc-900 overflow-hidden relative border border-zinc-200/50 dark:border-zinc-800/50">
+              {renderView()}
+            </main>
+          </div>
         </div>
-      </div>
+      ) : (
+        // Project Selector Layout (full screen, no sidebar)
+        <div className="h-screen w-full bg-zinc-100 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-white selection:bg-violet-500/30 transition-colors duration-200">
+          {renderView()}
+        </div>
+      )}
       
       {/* Tenant Creation Modal - TODO: Create TenantModal component */}
       {showTenantModal && (
