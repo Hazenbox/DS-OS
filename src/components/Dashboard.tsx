@@ -100,7 +100,7 @@ const ActivityItem: React.FC<{
   const description = formatActivityDescription(activity);
   
   return (
-    <div className="relative group">
+    <div className="relative">
       {/* Timeline connector */}
       {!isLast && (
         <div className="absolute left-[9px] top-7 w-px h-[calc(100%-4px)] bg-zinc-200 dark:bg-zinc-700/50" />
@@ -114,19 +114,16 @@ const ActivityItem: React.FC<{
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
-              {description} {actionConfig.verb} by <span className="font-medium text-zinc-900 dark:text-white">{userName}</span>
-            </p>
-            <ChevronRight size={14} className="text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-          </div>
+          <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+            {description} {actionConfig.verb} by <span className="font-medium text-zinc-900 dark:text-white">{userName}</span>
+          </p>
           <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
             {getRelativeTime(activity.timestamp)}
           </p>
         </div>
       </div>
     </div>
-);
+  );
 };
 
 export const Dashboard: React.FC = () => {
