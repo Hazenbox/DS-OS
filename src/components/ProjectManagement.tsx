@@ -10,39 +10,28 @@ import {
   Edit2, 
   Trash2, 
   Users, 
-  Settings, 
   MoreVertical,
   Check,
   X,
-  UserPlus,
-  UserMinus
+  ArrowRight
 } from 'lucide-react';
 import { ProjectModal } from './ProjectModal';
+import { DeleteProjectModal } from './DeleteProjectModal';
+import { InviteMembersModal } from './InviteMembersModal';
 import { TableSkeleton } from './LoadingSpinner';
 
-interface ProjectMember {
-  _id: Id<"projectMembers">;
-  projectId: Id<"projects">;
-  userId: Id<"users">;
-  role: "owner" | "admin" | "editor" | "viewer";
-  user: {
-    email: string;
-    name?: string;
-    image?: string;
-  } | null;
+interface ProjectManagementProps {
+  onProjectSelect?: (projectId: Id<"projects">) => void;
 }
 
-export const ProjectManagement: React.FC = () => {
+export const ProjectManagement: React.FC<ProjectManagementProps> = ({ onProjectSelect }) => {
   const { tenantId, userId } = useTenant();
   const { projectId: activeProjectId } = useProject();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<Id<"projects"> | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [selectedProjectId, setSelectedProjectId] = useState<Id<"projects"> | null>(null);
-  const [showMembers, setShowMembers] = useState<Id<"projects"> | null>(null);
-  const [showAddMember, setShowAddMember] = useState<Id<"projects"> | null>(null);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "viewer">("editor");
+  const [deleteProjectId, setDeleteProjectId] = useState<Id<"projects"> | null>(null);
+  const [inviteProjectId, setInviteProjectId] = useState<Id<"projects"> | null>(null);
   const [menuOpen, setMenuOpen] = useState<Id<"projects"> | null>(null);
 
   // Queries
@@ -51,26 +40,23 @@ export const ProjectManagement: React.FC = () => {
     tenantId && userId ? { tenantId, userId } : "skip"
   ) || [];
 
-  const projectMembers = useQuery(
-    api.projectMembers.list,
-    selectedProjectId && tenantId && userId
-      ? { projectId: selectedProjectId, tenantId, userId }
+  // Get stats for delete modal
+  const projectStats = useQuery(
+    api.projects.getStats,
+    deleteProjectId && tenantId && userId
+      ? { projectId: deleteProjectId, tenantId, userId }
       : "skip"
-  ) as ProjectMember[] | undefined;
+  );
+
+  // Get project details for delete modal
+  const projectToDelete = deleteProjectId
+    ? projects.find(p => p._id === deleteProjectId)
+    : null;
 
   // Mutations
   const updateProject = useMutation(api.projects.update);
   const deleteProject = useMutation(api.projects.remove);
-  const addMember = useMutation(api.projectMembers.add);
-  const removeMember = useMutation(api.projectMembers.remove);
-  const updateMemberRole = useMutation(api.projectMembers.updateRole);
   const setActiveProject = useMutation(api.projects.setActive);
-
-  // Get tenant users for adding members
-  const tenantUsers = useQuery(
-    api.tenants.getUsers,
-    tenantId && userId ? { tenantId, userId } : "skip"
-  ) as Array<{ userId: Id<"users">; email: string; user: { email: string; name?: string } | null }> | undefined;
 
   const handleRename = async (projectId: Id<"projects">) => {
     if (!editingName.trim() || !tenantId || !userId) return;
@@ -89,79 +75,14 @@ export const ProjectManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (projectId: Id<"projects">) => {
-    if (!tenantId || !userId) return;
-    if (!confirm('Are you sure you want to delete this project? This will delete all tokens, components, and releases.')) return;
+  const handleDeleteConfirm = async () => {
+    if (!deleteProjectId || !tenantId || !userId) return;
     try {
-      await deleteProject({ id: projectId, tenantId, userId });
-    } catch (error) {
+      await deleteProject({ id: deleteProjectId, tenantId, userId });
+      setDeleteProjectId(null);
+    } catch (error: any) {
       console.error('Failed to delete project:', error);
-      alert('Failed to delete project. You may need admin role.');
-    }
-  };
-
-  const handleAddMember = async (projectId: Id<"projects">) => {
-    if (!tenantId || !userId || !newMemberEmail.trim()) return;
-
-    // Find user by email
-    const targetUser = tenantUsers?.find(u => 
-      (u.user?.email || u.email).toLowerCase() === newMemberEmail.trim().toLowerCase()
-    );
-    if (!targetUser) {
-      alert('User not found. They must be a member of your workspace first.');
-      return;
-    }
-
-    try {
-      await addMember({
-        projectId,
-        tenantId,
-        userId,
-        targetUserId: targetUser.userId,
-        role: newMemberRole,
-      });
-      setNewMemberEmail('');
-      setShowAddMember(null);
-      setSelectedProjectId(projectId);
-    } catch (error: any) {
-      console.error('Failed to add member:', error);
-      alert(error.message || 'Failed to add member');
-    }
-  };
-
-  const handleRemoveMember = async (projectId: Id<"projects">, targetUserId: Id<"users">) => {
-    if (!tenantId || !userId) return;
-    if (!confirm('Remove this member from the project?')) return;
-    try {
-      await removeMember({
-        projectId,
-        tenantId,
-        userId,
-        targetUserId,
-      });
-    } catch (error: any) {
-      console.error('Failed to remove member:', error);
-      alert(error.message || 'Failed to remove member');
-    }
-  };
-
-  const handleUpdateRole = async (
-    projectId: Id<"projects">,
-    targetUserId: Id<"users">,
-    newRole: "owner" | "admin" | "editor" | "viewer"
-  ) => {
-    if (!tenantId || !userId) return;
-    try {
-      await updateMemberRole({
-        projectId,
-        tenantId,
-        userId,
-        targetUserId,
-        role: newRole,
-      });
-    } catch (error: any) {
-      console.error('Failed to update role:', error);
-      alert(error.message || 'Failed to update role');
+      alert(error.message || 'Failed to delete project. You may need admin role.');
     }
   };
 
@@ -169,6 +90,10 @@ export const ProjectManagement: React.FC = () => {
     if (!tenantId || !userId) return;
     try {
       await setActiveProject({ id: projectId, tenantId, userId });
+      // Navigate to dashboard when project is selected
+      if (onProjectSelect) {
+        onProjectSelect(projectId);
+      }
     } catch (error) {
       console.error('Failed to set active project:', error);
     }
@@ -268,7 +193,7 @@ export const ProjectManagement: React.FC = () => {
                       </div>
                     ) : (
                       <>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleSetActive(project._id)}>
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                               {project.name}
@@ -289,16 +214,14 @@ export const ProjectManagement: React.FC = () => {
                           {!project.isActive && (
                             <button
                               onClick={() => handleSetActive(project._id)}
-                              className="h-7 px-3 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-md transition-colors"
+                              className="h-7 px-3 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-md transition-colors flex items-center gap-1.5"
                             >
-                              Set Active
+                              Open
+                              <ArrowRight size={12} />
                             </button>
                           )}
                           <button
-                            onClick={() => {
-                              setShowMembers(showMembers === project._id ? null : project._id);
-                              setSelectedProjectId(showMembers === project._id ? null : project._id);
-                            }}
+                            onClick={() => setInviteProjectId(project._id)}
                             className="h-7 px-3 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors flex items-center gap-1.5"
                           >
                             <Users size={14} />
@@ -326,7 +249,7 @@ export const ProjectManagement: React.FC = () => {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    handleDelete(project._id);
+                                    setDeleteProjectId(project._id);
                                     setMenuOpen(null);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
@@ -342,116 +265,6 @@ export const ProjectManagement: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Members Section */}
-                {showMembers === project._id && (
-                  <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                        Members
-                      </h4>
-                      <button
-                        onClick={() => setShowAddMember(showAddMember === project._id ? null : project._id)}
-                        className="h-6 px-2 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-md transition-colors flex items-center gap-1.5"
-                      >
-                        <UserPlus size={12} />
-                        Add Member
-                      </button>
-                    </div>
-
-                    {/* Add Member Form */}
-                    {showAddMember === project._id && (
-                      <div className="mb-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            type="email"
-                            placeholder="Enter email address"
-                            value={newMemberEmail}
-                            onChange={(e) => setNewMemberEmail(e.target.value)}
-                            className="flex-1 h-7 px-2 text-xs border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          />
-                          <select
-                            value={newMemberRole}
-                            onChange={(e) => setNewMemberRole(e.target.value as any)}
-                            className="h-7 px-2 text-xs border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          >
-                            <option value="editor">Editor</option>
-                            <option value="admin">Admin</option>
-                            <option value="viewer">Viewer</option>
-                          </select>
-                          <button
-                            onClick={() => handleAddMember(project._id)}
-                            className="h-7 px-3 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded-md transition-colors"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowAddMember(null);
-                              setNewMemberEmail('');
-                            }}
-                            className="h-7 w-7 flex items-center justify-center text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Members List */}
-                    {selectedProjectId === project._id && (
-                      <div className="space-y-2">
-                        {projectMembers === undefined ? (
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">Loading members...</div>
-                        ) : projectMembers.length === 0 ? (
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">No members yet</div>
-                        ) : (
-                          projectMembers.map((member) => (
-                            <div
-                              key={member._id}
-                              className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-md"
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                                  {member.user?.email?.charAt(0).toUpperCase() || '?'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium text-zinc-900 dark:text-white truncate">
-                                    {member.user?.name || member.user?.email || 'Unknown User'}
-                                  </div>
-                                  <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                                    {member.user?.email}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={member.role}
-                                  onChange={(e) => handleUpdateRole(project._id, member.userId, e.target.value as any)}
-                                  disabled={member.role === 'owner'}
-                                  className="h-6 px-2 text-xs border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <option value="owner">Owner</option>
-                                  <option value="admin">Admin</option>
-                                  <option value="editor">Editor</option>
-                                  <option value="viewer">Viewer</option>
-                                </select>
-                                {member.role !== 'owner' && (
-                                  <button
-                                    onClick={() => handleRemoveMember(project._id, member.userId)}
-                                    className="h-6 w-6 flex items-center justify-center text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                                  >
-                                    <UserMinus size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -468,6 +281,33 @@ export const ProjectManagement: React.FC = () => {
         />
       )}
 
+      {/* Delete Project Modal */}
+      {deleteProjectId && projectToDelete && (
+        <DeleteProjectModal
+          isOpen={!!deleteProjectId}
+          onClose={() => setDeleteProjectId(null)}
+          onConfirm={handleDeleteConfirm}
+          projectName={projectToDelete.name}
+          projectDescription={projectToDelete.description}
+          lastEdited={projectToDelete.updatedAt ? new Date(projectToDelete.updatedAt).toISOString() : undefined}
+          usageCount={projectStats ? {
+            tokens: projectStats.tokens,
+            components: projectStats.components,
+            releases: projectStats.releases,
+          } : undefined}
+        />
+      )}
+
+      {/* Invite Members Modal */}
+      {inviteProjectId && (
+        <InviteMembersModal
+          isOpen={!!inviteProjectId}
+          onClose={() => setInviteProjectId(null)}
+          projectId={inviteProjectId}
+          projectName={projects.find(p => p._id === inviteProjectId)?.name || 'Project'}
+        />
+      )}
+
       {/* Close menu on outside click */}
       {menuOpen && (
         <div
@@ -478,4 +318,3 @@ export const ProjectManagement: React.FC = () => {
     </div>
   );
 };
-

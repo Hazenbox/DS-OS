@@ -28,7 +28,7 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 // URL path to view mapping
 const pathToView: Record<string, ViewState> = {
-  '/': 'dashboard',
+  '/': 'projects', // Projects is now the default landing page
   '/overview': 'dashboard',
   '/tokens': 'tokens',
   '/builder': 'builder',
@@ -57,8 +57,8 @@ const getViewFromPath = (): ViewState => {
   if (pathToView[path]) {
     return pathToView[path];
   }
-  // Default to dashboard
-  return 'dashboard';
+  // Default to projects (first page after login)
+  return 'projects';
 };
 
 // Inner app component that uses tenant and project context
@@ -101,6 +101,13 @@ const AppContent: React.FC<{
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Redirect to projects if no project selected (except for projects and settings views)
+  useEffect(() => {
+    if (!projectId && !isProjectLoading && tenantId && currentView !== 'projects' && currentView !== 'settings') {
+      handleViewChange('projects');
+    }
+  }, [projectId, isProjectLoading, tenantId, currentView]);
+
   const renderView = () => {
     // Show "no tenant" state if no active tenant
     if (!tenantId && !isTenantLoading) {
@@ -133,39 +140,13 @@ const AppContent: React.FC<{
       );
     }
     
-    // Show "no project" state if no active project
-    if (!projectId && !isProjectLoading && tenantId) {
-      return (
-        <div className="flex flex-col h-full">
-          <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
-            <div>
-              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
-                {currentView === 'settings' ? 'Settings' : 'Get Started'}
-              </h2>
-            </div>
-          </div>
-          {currentView === 'settings' ? (
-            <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400">
-              <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-3">
-                <FolderOpen size={24} className="text-violet-500" strokeWidth={1.5} />
-              </div>
-              <h2 className="text-sm font-medium text-zinc-900 dark:text-white mb-1">Create Your First Project</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                Organize your tokens, components, and releases.
-              </p>
-              <button
-                onClick={() => setShowProjectModal(true)}
-                className="flex items-center gap-1.5 px-3 h-8 bg-violet-600 text-white rounded-md text-xs font-medium hover:bg-violet-700 transition-colors"
-              >
-                <Plus size={14} />
-                Create Project
-              </button>
-            </div>
-          )}
-        </div>
-      );
+    // Show "no project" state if no active project (but allow projects and settings views)
+    if (!projectId && !isProjectLoading && tenantId && currentView !== 'projects' && currentView !== 'settings') {
+      // Redirect to projects page if no project is selected
+      useEffect(() => {
+        handleViewChange('projects');
+      }, []);
+      return null;
     }
 
     switch (currentView) {
@@ -180,7 +161,14 @@ const AppContent: React.FC<{
       case 'settings':
         return <Settings themeMode={themeMode} resolvedTheme={resolvedTheme} onThemeModeChange={onThemeModeChange} />;
       case 'projects':
-        return <ProjectManagement />;
+        return (
+          <ProjectManagement 
+            onProjectSelect={(projectId) => {
+              // Navigate to dashboard when project is selected
+              handleViewChange('dashboard');
+            }}
+          />
+        );
       case 'documentation':
         return (
           <div className="flex flex-col h-full">

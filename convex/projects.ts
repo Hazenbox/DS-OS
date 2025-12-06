@@ -88,6 +88,55 @@ export const get = query({
   },
 });
 
+// Get project statistics (token count, component count, release count)
+export const getStats = query({
+  args: {
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.tenantId !== args.tenantId) {
+      throw new Error("Project not found");
+    }
+    
+    // Count tokens
+    const tokens = await ctx.db
+      .query("tokens")
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
+      )
+      .collect();
+    
+    // Count components
+    const components = await ctx.db
+      .query("components")
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
+      )
+      .collect();
+    
+    // Count releases
+    const releases = await ctx.db
+      .query("releases")
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
+      )
+      .collect();
+    
+    return {
+      tokens: tokens.length,
+      components: components.length,
+      releases: releases.length,
+    };
+  },
+});
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
