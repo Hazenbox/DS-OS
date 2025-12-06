@@ -747,6 +747,25 @@ export const ComponentBuilder: React.FC = () => {
   // Only show warning if keys have been checked and are missing
   const showApiKeyWarning = !isApiKeysLoading && !canExtract;
   
+  // Validate Figma URL
+  const isValidFigmaUrl = React.useMemo(() => {
+    if (!figmaUrl.trim()) return false;
+    try {
+      const url = new URL(figmaUrl);
+      // Must be figma.com domain
+      if (!url.hostname.includes('figma.com')) return false;
+      // Must have /file/ or /design/ in path
+      if (!url.pathname.includes('/file/') && !url.pathname.includes('/design/')) return false;
+      // Must have a file key (alphanumeric string after /file/ or /design/)
+      const pathParts = url.pathname.split('/');
+      const fileIndex = pathParts.indexOf('file') !== -1 ? pathParts.indexOf('file') : pathParts.indexOf('design');
+      if (fileIndex === -1 || !pathParts[fileIndex + 1]) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }, [figmaUrl]);
+  
   // Convex mutations & actions
   const createComponent = useMutation(api.components.create);
   const removeComponent = useMutation(api.components.remove);
@@ -836,7 +855,6 @@ export const ComponentBuilder: React.FC = () => {
       <div className="w-72 border-r border-zinc-200/60 dark:border-zinc-800/60 flex flex-col bg-white dark:bg-zinc-900">
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Figma → React with Claude AI</p>
         </div>
         
         {/* API Key Status - only show if checked and missing */}
@@ -862,7 +880,7 @@ export const ComponentBuilder: React.FC = () => {
           />
           <button
             onClick={handleExtract}
-            disabled={!figmaUrl.trim() || isApiKeysLoading || !canExtract || isExtracting}
+            disabled={!isValidFigmaUrl || isApiKeysLoading || !canExtract || isExtracting}
             className="w-full h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
             {isExtracting ? (
@@ -883,10 +901,6 @@ export const ComponentBuilder: React.FC = () => {
               {extractionError}
             </div>
           )}
-          
-          <p className="text-[10px] text-zinc-400 mt-2 text-center">
-            Extracts 100% of Figma properties with Claude AI
-          </p>
         </div>
         
         {/* Saved Components List */}
