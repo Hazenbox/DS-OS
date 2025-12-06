@@ -4,6 +4,8 @@ import { api } from '../../convex/_generated/api';
 import { ViewState } from '../types';
 import { Hexagon, ChevronDown, LogOut, Plus, Check, FolderOpen } from 'lucide-react';
 import { Id } from '../../convex/_generated/dataModel';
+import { useTenant } from '../contexts/TenantContext';
+import { useProject } from '../contexts/ProjectContext';
 
 interface User {
   userId: string;
@@ -27,10 +29,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   const userMenuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
-  // Convex queries and mutations - scoped to user
-  const userId = user?.email;
-  const projects = useQuery(api.projects.list, userId ? { userId } : "skip") || [];
-  const activeProject = useQuery(api.projects.getActive, userId ? { userId } : "skip");
+  // Get tenant and user IDs from contexts
+  const { tenantId, userId: tenantUserId } = useTenant();
+  const { userId: projectUserId } = useProject();
+  
+  // Use tenant context userId (more reliable)
+  const effectiveUserId = tenantUserId || projectUserId;
+  
+  // Convex queries and mutations - scoped to tenant and user
+  const projects = useQuery(
+    api.projects.list, 
+    tenantId && effectiveUserId 
+      ? { tenantId, userId: effectiveUserId } 
+      : "skip"
+  ) || [];
+  const activeProject = useQuery(
+    api.projects.getActive, 
+    tenantId && effectiveUserId 
+      ? { tenantId, userId: effectiveUserId } 
+      : "skip"
+  );
   const setActiveProject = useMutation(api.projects.setActive);
 
   // Close menus when clicking outside
@@ -49,9 +67,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   }, []);
 
   const handleSelectProject = async (projectId: Id<"projects">) => {
-    if (!userId) return;
+    if (!tenantId || !effectiveUserId) return;
     try {
-      await setActiveProject({ id: projectId, userId });
+      await setActiveProject({ id: projectId, tenantId, userId: effectiveUserId });
       setIsProjectMenuOpen(false);
     } catch (error) {
       console.error('Failed to switch project:', error);
