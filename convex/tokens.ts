@@ -1,21 +1,24 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
 
 // ============================================================================
-// HELPER: Verify project access
+// HELPER: Verify project access (tenant-aware)
 // ============================================================================
 async function verifyProjectAccess(
   ctx: any,
-  projectId: any,
-  userId: string
+  projectId: Id<"projects">,
+  tenantId: Id<"tenants">,
+  userId: Id<"users">
 ): Promise<void> {
   const project = await ctx.db.get(projectId);
   if (!project) {
     throw new Error("Project not found");
   }
-  if (project.userId !== userId) {
-    throw new Error("Access denied: You don't have access to this project");
-  }
+  
+  // Verify tenant access
+  verifyTenantResource(ctx, tenantId, project);
 }
 
 // ============================================================================
@@ -27,17 +30,31 @@ async function verifyProjectAccess(
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     if (!args.projectId) {
       return [];
     }
     
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return [];
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     // Get all inactive file IDs for this project
     const inactiveFiles = await ctx.db
       .query("tokenFiles")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
+      )
       .filter((q) => q.eq(q.field("isActive"), false))
       .collect();
     
@@ -47,14 +64,17 @@ export const list = query({
     if (args.type) {
       tokens = await ctx.db
         .query("tokens")
-        .withIndex("by_project_type", (q) => 
-          q.eq("projectId", args.projectId!).eq("type", args.type as any)
+        .withIndex("by_tenant_project", (q) => 
+          q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
         )
+        .filter((q) => q.eq(q.field("type"), args.type as any))
         .collect();
     } else {
       tokens = await ctx.db
         .query("tokens")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+        .withIndex("by_tenant_project", (q) => 
+          q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
+        )
         .collect();
     }
     
@@ -66,23 +86,22 @@ export const list = query({
   },
 });
 
-// Get a single token by ID (with project access verification)
+// Get a single token by ID (with tenant access verification)
 export const get = query({
   args: { 
     id: v.id("tokens"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const token = await ctx.db.get(args.id);
     if (!token) return null;
     
-    // If userId provided, verify access
-    if (args.userId) {
-      const project = await ctx.db.get(token.projectId);
-      if (!project || project.userId !== args.userId) {
-        return null;
-      }
-    }
+    // Verify token belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, token);
     
     return token;
   },
@@ -96,7 +115,8 @@ export const get = query({
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     name: v.string(),
     value: v.string(),
     type: v.union(
@@ -113,10 +133,14 @@ export const create = mutation({
     brand: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, ...tokenData } = args;
+    const { tenantId, userId, ...tokenData } = args;
+    
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
     
     // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, userId);
+    await verifyProjectAccess(ctx, args.projectId, tenantId, userId);
     
     // Input validation
     const name = tokenData.name.trim();
@@ -127,16 +151,22 @@ export const create = mutation({
       throw new Error("Token name must be less than 100 characters");
     }
     
+    // Get user email for activity log
+    const user = await ctx.db.get(userId);
+    const userEmail = user?.email || "unknown";
+    
     const tokenId = await ctx.db.insert("tokens", {
+      tenantId,
       ...tokenData,
       name,
       description: tokenData.description?.trim(),
     });
     
-    // Log activity with actual user
+    // Log activity
     await ctx.db.insert("activity", {
+      tenantId,
       projectId: args.projectId,
-      user: userId,
+      user: userEmail,
       action: "create",
       target: `Token: ${name}`,
       targetType: "token",
@@ -150,8 +180,8 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("tokens"),
-    projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     name: v.optional(v.string()),
     value: v.optional(v.string()),
     type: v.optional(v.union(
@@ -168,20 +198,19 @@ export const update = mutation({
     brand: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, projectId, userId, ...updates } = args;
+    const { id, tenantId, userId, ...updates } = args;
     
-    // Verify project access
-    await verifyProjectAccess(ctx, projectId, userId);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
     
     const existing = await ctx.db.get(id);
     if (!existing) {
       throw new Error("Token not found");
     }
     
-    // Verify token belongs to this project
-    if (existing.projectId.toString() !== projectId.toString()) {
-      throw new Error("Token does not belong to this project");
-    }
+    // Verify token belongs to tenant
+    verifyTenantResource(ctx, tenantId, existing);
     
     // Validate name if provided
     if (updates.name !== undefined) {
@@ -201,10 +230,15 @@ export const update = mutation({
     
     await ctx.db.patch(id, filteredUpdates);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId,
       projectId: existing.projectId,
-      user: userId,
+      user: userEmail,
       action: "update",
       target: `Token: ${existing.name}`,
       targetType: "token",
@@ -218,29 +252,33 @@ export const update = mutation({
 export const remove = mutation({
   args: { 
     id: v.id("tokens"),
-    projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, args.userId);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
     
     const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Token not found");
     }
     
-    // Verify token belongs to this project
-    if (existing.projectId.toString() !== args.projectId.toString()) {
-      throw new Error("Token does not belong to this project");
-    }
+    // Verify token belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, existing);
     
     await ctx.db.delete(args.id);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: existing.projectId,
-      user: args.userId,
+      user: userEmail,
       action: "delete",
       target: `Token: ${existing.name}`,
       targetType: "token",
@@ -254,7 +292,8 @@ export const remove = mutation({
 export const bulkImport = mutation({
   args: {
     projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     tokens: v.array(v.object({
       name: v.string(),
       value: v.string(),
@@ -275,8 +314,12 @@ export const bulkImport = mutation({
     clearExisting: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
     // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, args.userId);
+    await verifyProjectAccess(ctx, args.projectId, args.tenantId, args.userId);
     
     // Limit bulk import size
     if (args.tokens.length > 1000) {
@@ -287,17 +330,24 @@ export const bulkImport = mutation({
     if (args.clearExisting) {
       const existingTokens = await ctx.db
         .query("tokens")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .withIndex("by_tenant_project", (q) => 
+          q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
+        )
         .collect();
       for (const token of existingTokens) {
         await ctx.db.delete(token._id);
       }
     }
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Insert new tokens
     const insertedIds = [];
     for (const token of args.tokens) {
       const id = await ctx.db.insert("tokens", {
+        tenantId: args.tenantId,
         ...token,
         name: token.name.trim(),
         projectId: args.projectId,
@@ -308,8 +358,9 @@ export const bulkImport = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: args.projectId,
-      user: args.userId,
+      user: userEmail,
       action: "import",
       target: `Imported ${args.tokens.length} tokens`,
       targetType: "token",
@@ -323,19 +374,29 @@ export const bulkImport = mutation({
 export const deleteByFile = mutation({
   args: {
     fileId: v.id("tokenFiles"),
-    projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, args.userId);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
+    // Verify file belongs to tenant
+    const file = await ctx.db.get(args.fileId);
+    if (!file) {
+      throw new Error("File not found");
+    }
+    verifyTenantResource(ctx, args.tenantId, file);
     
     const tokens = await ctx.db
       .query("tokens")
       .withIndex("by_source_file", (q) => q.eq("sourceFileId", args.fileId))
       .collect();
     
+    // Verify all tokens belong to tenant
     for (const token of tokens) {
+      verifyTenantResource(ctx, args.tenantId, token);
       await ctx.db.delete(token._id);
     }
     

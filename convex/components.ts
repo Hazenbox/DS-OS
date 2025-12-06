@@ -1,21 +1,24 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
 
 // ============================================================================
-// HELPER: Verify project access
+// HELPER: Verify project access (tenant-aware)
 // ============================================================================
 async function verifyProjectAccess(
   ctx: any,
-  projectId: any,
-  userId: string
+  projectId: Id<"projects">,
+  tenantId: Id<"tenants">,
+  userId: Id<"users">
 ): Promise<void> {
   const project = await ctx.db.get(projectId);
   if (!project) {
     throw new Error("Project not found");
   }
-  if (project.userId !== userId) {
-    throw new Error("Access denied: You don't have access to this project");
-  }
+  
+  // Verify tenant access
+  verifyTenantResource(ctx, tenantId, project);
 }
 
 // ============================================================================
@@ -26,6 +29,8 @@ async function verifyProjectAccess(
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     status: v.optional(v.union(
       v.literal("draft"),
       v.literal("review"),
@@ -34,43 +39,55 @@ export const list = query({
     )),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     if (!args.projectId) {
       return [];
     }
     
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return [];
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     if (args.status) {
       return await ctx.db
         .query("components")
-        .withIndex("by_project_status", (q) => 
-          q.eq("projectId", args.projectId!).eq("status", args.status!)
+        .withIndex("by_tenant_project", (q) => 
+          q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
         )
+        .filter((q) => q.eq(q.field("status"), args.status!))
         .collect();
     }
     
     return await ctx.db
       .query("components")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
+      )
       .collect();
   },
 });
 
-// Get a single component by ID (with project access verification)
+// Get a single component by ID (with tenant access verification)
 export const get = query({
   args: { 
     id: v.id("components"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const component = await ctx.db.get(args.id);
     if (!component) return null;
     
-    // If userId provided, verify access
-    if (args.userId) {
-      const project = await ctx.db.get(component.projectId);
-      if (!project || project.userId !== args.userId) {
-        return null;
-      }
-    }
+    // Verify component belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, component);
     
     return component;
   },
@@ -84,7 +101,8 @@ export const get = query({
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     name: v.string(),
     status: v.union(
       v.literal("draft"),
@@ -97,12 +115,14 @@ export const create = mutation({
     docs: v.string(),
   },
   handler: async (ctx, args) => {
-    const { userId, ...componentData } = args;
+    const { tenantId, userId, ...componentData } = args;
     
-    // Verify project access if userId provided
-    if (userId) {
-      await verifyProjectAccess(ctx, args.projectId, userId);
-    }
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
+    
+    // Verify project access
+    await verifyProjectAccess(ctx, args.projectId, tenantId, userId);
     
     // Input validation
     const name = componentData.name.trim();
@@ -118,15 +138,21 @@ export const create = mutation({
       throw new Error("Version must be in semver format (e.g., 1.0.0)");
     }
     
+    // Get user email for activity log
+    const user = await ctx.db.get(userId);
+    const userEmail = user?.email || "unknown";
+    
     const componentId = await ctx.db.insert("components", {
+      tenantId,
       ...componentData,
       name,
     });
     
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId,
       projectId: args.projectId,
-      user: userId || "System",
+      user: userEmail,
       action: "create",
       target: `Component: ${name}`,
       targetType: "component",
@@ -140,7 +166,8 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("components"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     name: v.optional(v.string()),
     status: v.optional(v.union(
       v.literal("draft"),
@@ -153,17 +180,19 @@ export const update = mutation({
     docs: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, userId, ...updates } = args;
-    const existing = await ctx.db.get(id);
+    const { id, tenantId, userId, ...updates } = args;
     
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
+    
+    const existing = await ctx.db.get(id);
     if (!existing) {
       throw new Error("Component not found");
     }
     
-    // Verify project access if userId provided
-    if (userId) {
-      await verifyProjectAccess(ctx, existing.projectId, userId);
-    }
+    // Verify component belongs to tenant
+    verifyTenantResource(ctx, tenantId, existing);
     
     // Validate name if provided
     if (updates.name !== undefined) {
@@ -188,10 +217,15 @@ export const update = mutation({
     
     await ctx.db.patch(id, filteredUpdates);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId,
       projectId: existing.projectId,
-      user: userId || "System",
+      user: userEmail,
       action: "update",
       target: `Component: ${existing.name}`,
       targetType: "component",
@@ -205,26 +239,33 @@ export const update = mutation({
 export const remove = mutation({
   args: { 
     id: v.id("components"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.id);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
     
+    const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Component not found");
     }
     
-    // Verify project access if userId provided
-    if (args.userId) {
-      await verifyProjectAccess(ctx, existing.projectId, args.userId);
-    }
+    // Verify component belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, existing);
     
     await ctx.db.delete(args.id);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: existing.projectId,
-      user: args.userId || "System",
+      user: userEmail,
       action: "delete",
       target: `Component: ${existing.name}`,
       targetType: "component",

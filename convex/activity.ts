@@ -1,10 +1,14 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
 
 // Get all activity logs for a project, ordered by creation time (newest first)
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     limit: v.optional(v.number()),
     targetType: v.optional(v.union(
       v.literal("token"),
@@ -14,13 +18,25 @@ export const list = query({
     )),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     if (!args.projectId) {
       return [];
     }
     
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return [];
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     const activities = await ctx.db
       .query("activity")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
+      )
       .order("desc")
       .collect();
     
@@ -38,9 +54,10 @@ export const list = query({
   },
 });
 
-// Create a new activity log entry
+// Create a new activity log entry (internal use - tenantId should be provided)
 export const create = mutation({
   args: {
+    tenantId: v.id("tenants"),
     projectId: v.optional(v.id("projects")),
     user: v.string(),
     action: v.union(
@@ -68,12 +85,27 @@ export const create = mutation({
 export const cleanup = mutation({
   args: { 
     projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     keepCount: v.number() 
   },
   handler: async (ctx, args) => {
+    // Verify tenant access and require admin role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "admin");
+    
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     const activities = await ctx.db
       .query("activity")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
+      )
       .order("desc")
       .collect();
     

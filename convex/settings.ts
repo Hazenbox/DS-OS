@@ -1,48 +1,62 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext } from "./tenantMiddleware";
 
-// Get a setting by key for a specific user
+// Get a setting by key for a tenant (migrated from user-scoped)
 export const get = query({
   args: { 
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     key: v.string() 
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const setting = await ctx.db
       .query("settings")
-      .withIndex("by_user_key", (q) => 
-        q.eq("userId", args.userId).eq("key", args.key)
+      .withIndex("by_tenant_key", (q) => 
+        q.eq("tenantId", args.tenantId).eq("key", args.key)
       )
       .first();
     return setting?.value ?? null;
   },
 });
 
-// Get all settings for a user
+// Get all settings for a tenant
 export const list = query({
   args: {
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     return await ctx.db
       .query("settings")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
       .collect();
   },
 });
 
-// Set a setting for a user (upsert)
+// Set a setting for a tenant (upsert)
 export const set = mutation({
   args: {
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     key: v.string(),
     value: v.string(),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_user_key", (q) => 
-        q.eq("userId", args.userId).eq("key", args.key)
+      .withIndex("by_tenant_key", (q) => 
+        q.eq("tenantId", args.tenantId).eq("key", args.key)
       )
       .first();
     
@@ -51,7 +65,8 @@ export const set = mutation({
       return existing._id;
     } else {
       return await ctx.db.insert("settings", {
-        userId: args.userId,
+        tenantId: args.tenantId,
+        userId: args.userId, // Keep for backward compatibility
         key: args.key,
         value: args.value,
       });
@@ -59,17 +74,21 @@ export const set = mutation({
   },
 });
 
-// Delete a setting for a user
+// Delete a setting for a tenant
 export const remove = mutation({
   args: { 
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     key: v.string() 
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_user_key", (q) => 
-        q.eq("userId", args.userId).eq("key", args.key)
+      .withIndex("by_tenant_key", (q) => 
+        q.eq("tenantId", args.tenantId).eq("key", args.key)
       )
       .first();
     

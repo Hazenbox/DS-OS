@@ -1,21 +1,24 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
 
 // ============================================================================
-// HELPER: Verify project access
+// HELPER: Verify project access (tenant-aware)
 // ============================================================================
 async function verifyProjectAccess(
   ctx: any,
-  projectId: any,
-  userId: string
+  projectId: Id<"projects">,
+  tenantId: Id<"tenants">,
+  userId: Id<"users">
 ): Promise<void> {
   const project = await ctx.db.get(projectId);
   if (!project) {
     throw new Error("Project not found");
   }
-  if (project.userId !== userId) {
-    throw new Error("Access denied: You don't have access to this project");
-  }
+  
+  // Verify tenant access
+  verifyTenantResource(ctx, tenantId, project);
 }
 
 // ============================================================================
@@ -26,15 +29,29 @@ async function verifyProjectAccess(
 export const list = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     if (!args.projectId) {
       return [];
     }
     
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return [];
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
     return await ctx.db
       .query("releases")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId!))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
+      )
       .order("desc")
       .collect();
   },
@@ -44,39 +61,53 @@ export const list = query({
 export const latest = query({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     if (!args.projectId) {
       return null;
     }
     
-    return await ctx.db
+    // Verify project belongs to tenant
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      return null;
+    }
+    verifyTenantResource(ctx, args.tenantId, project);
+    
+    const releases = await ctx.db
       .query("releases")
-      .withIndex("by_project_status", (q) => 
-        q.eq("projectId", args.projectId!).eq("status", "published")
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId!)
       )
+      .filter((q) => q.eq(q.field("status"), "published"))
       .order("desc")
-      .first();
+      .collect();
+    
+    return releases[0] || null;
   },
 });
 
-// Get a single release by ID (with access check)
+// Get a single release by ID (with tenant access check)
 export const get = query({
   args: { 
     id: v.id("releases"),
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const release = await ctx.db.get(args.id);
     if (!release) return null;
     
-    // If userId provided, verify access
-    if (args.userId) {
-      const project = await ctx.db.get(release.projectId);
-      if (!project || project.userId !== args.userId) {
-        return null;
-      }
-    }
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, release);
     
     return release;
   },
@@ -90,16 +121,21 @@ export const get = query({
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     version: v.string(),
     changelog: v.string(),
     components: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, ...releaseData } = args;
+    const { tenantId, userId, ...releaseData } = args;
+    
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, userId, tenantId);
+    await requireRole(ctx, tenantId, userId, "developer");
     
     // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, userId);
+    await verifyProjectAccess(ctx, args.projectId, tenantId, userId);
     
     // Input validation
     const version = releaseData.version.trim();
@@ -113,7 +149,9 @@ export const create = mutation({
     // Check for duplicate version
     const existing = await ctx.db
       .query("releases")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_tenant_project", (q) => 
+        q.eq("tenantId", tenantId).eq("projectId", args.projectId)
+      )
       .filter((q) => q.eq(q.field("version"), version))
       .first();
     
@@ -121,7 +159,12 @@ export const create = mutation({
       throw new Error(`Release ${version} already exists`);
     }
     
+    // Get user email for activity log
+    const user = await ctx.db.get(userId);
+    const userEmail = user?.email || "unknown";
+    
     const releaseId = await ctx.db.insert("releases", {
+      tenantId,
       ...releaseData,
       version,
       status: "draft",
@@ -129,8 +172,9 @@ export const create = mutation({
     
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId,
       projectId: args.projectId,
-      user: userId,
+      user: userEmail,
       action: "create",
       target: `Release: ${version}`,
       targetType: "release",
@@ -144,7 +188,8 @@ export const create = mutation({
 export const updateStatus = mutation({
   args: {
     id: v.id("releases"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     status: v.union(
       v.literal("draft"),
       v.literal("in_progress"),
@@ -153,14 +198,17 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.id);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
     
+    const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Release not found");
     }
     
-    // Verify project access
-    await verifyProjectAccess(ctx, existing.projectId, args.userId);
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, existing);
     
     // Validate status transitions
     const validTransitions: Record<string, string[]> = {
@@ -182,10 +230,15 @@ export const updateStatus = mutation({
     
     await ctx.db.patch(args.id, updates);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: existing.projectId,
-      user: args.userId,
+      user: userEmail,
       action: "release",
       target: `Release ${existing.version}: ${args.status}`,
       targetType: "release",
@@ -199,18 +252,22 @@ export const updateStatus = mutation({
 export const updateChangelog = mutation({
   args: {
     id: v.id("releases"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     changelog: v.string(),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.id);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
     
+    const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Release not found");
     }
     
-    // Verify project access
-    await verifyProjectAccess(ctx, existing.projectId, args.userId);
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, existing);
     
     // Only allow editing draft releases
     if (existing.status !== "draft") {
@@ -219,10 +276,15 @@ export const updateChangelog = mutation({
     
     await ctx.db.patch(args.id, { changelog: args.changelog });
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: existing.projectId,
-      user: args.userId,
+      user: userEmail,
       action: "update",
       target: `Release ${existing.version}: changelog updated`,
       targetType: "release",
@@ -236,17 +298,21 @@ export const updateChangelog = mutation({
 export const remove = mutation({
   args: {
     id: v.id("releases"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.get(args.id);
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
     
+    const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Release not found");
     }
     
-    // Verify project access
-    await verifyProjectAccess(ctx, existing.projectId, args.userId);
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, existing);
     
     // Only allow deleting draft releases
     if (existing.status !== "draft") {
@@ -255,10 +321,15 @@ export const remove = mutation({
     
     await ctx.db.delete(args.id);
     
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
     // Log activity
     await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
       projectId: existing.projectId,
-      user: args.userId,
+      user: userEmail,
       action: "delete",
       target: `Release: ${existing.version}`,
       targetType: "release",
