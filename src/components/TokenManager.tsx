@@ -6,6 +6,7 @@ import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
 import { Trash2, Edit2, Save, Upload, Download, X, FileJson, Check, MoreVertical, AlertCircle, Eye } from 'lucide-react';
 import { TokenExport } from './TokenExport';
 import { useProject } from '../contexts/ProjectContext';
+import { useTenant } from '../contexts/TenantContext';
 import { TableSkeleton, FileSkeleton } from './LoadingSpinner';
 
 const TABS: { id: TokenType; label: string }[] = [
@@ -351,7 +352,12 @@ const parseTokensFromJSON = (json: any): ParsedToken[] => {
 // ============================================================================
 
 export const TokenManager: React.FC = () => {
-    const { projectId, userId } = useProject();
+    const { projectId, tenantId, userId } = useProject();
+    const { tenantId: tenantIdFromContext, userId: userIdFromContext } = useTenant();
+    
+    // Use tenantId and userId from TenantContext (more reliable)
+    const effectiveTenantId = tenantIdFromContext || tenantId;
+    const effectiveUserId = userIdFromContext || userId;
     const [activeTab, setActiveTab] = useState<TokenType>('color');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -383,9 +389,19 @@ export const TokenManager: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Convex queries - scoped to project
-    const tokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
-    const tokenFiles = useQuery(api.tokenFiles.list, projectId ? { projectId } : "skip") as TokenFile[] | undefined;
+    // Convex queries - scoped to tenant and project
+    const tokens = useQuery(
+        api.tokens.list, 
+        projectId && effectiveTenantId && effectiveUserId 
+            ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    );
+    const tokenFiles = useQuery(
+        api.tokenFiles.list, 
+        projectId && effectiveTenantId && effectiveUserId 
+            ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    ) as TokenFile[] | undefined;
     
     // Loading states
     const isLoadingTokens = tokens === undefined && projectId;
@@ -412,9 +428,9 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleSave = async (id: Id<"tokens">) => {
-        if (!projectId || !userId) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId) return;
         try {
-            await updateToken({ id, projectId, userId, value: editValue });
+            await updateToken({ id, tenantId: effectiveTenantId, userId: effectiveUserId, value: editValue });
             setEditingId(null);
         } catch (error) {
             console.error('Failed to update token:', error);
@@ -422,21 +438,22 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleDelete = async (id: Id<"tokens">) => {
-        if (!projectId || !userId) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId) return;
         try {
-            await removeToken({ id, projectId, userId });
+            await removeToken({ id, tenantId: effectiveTenantId, userId: effectiveUserId });
         } catch (error) {
             console.error('Failed to delete token:', error);
         }
     };
 
     const handleAddToken = async () => {
-        if (!newToken.name || !newToken.value || !projectId || !userId) return;
+        if (!newToken.name || !newToken.value || !projectId || !effectiveTenantId || !effectiveUserId) return;
         
         try {
             await createToken({
                 projectId,
-                userId,
+                tenantId: effectiveTenantId,
+                userId: effectiveUserId,
                 name: newToken.name,
                 value: newToken.value,
                 type: newToken.type,
@@ -483,23 +500,25 @@ export const TokenManager: React.FC = () => {
 
     // Confirm and import tokens from preview
     const handleConfirmImport = async () => {
-        if (!projectId || !userId || previewTokens.length === 0) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId || previewTokens.length === 0) return;
         
         try {
             // Create the file record first
             const fileId = await createFile({
                 projectId,
+                tenantId: effectiveTenantId,
+                userId: effectiveUserId,
                 name: previewFileName.replace('.json', ''),
                 originalName: previewFileName,
                 content: previewFileContent,
                 tokenCount: previewTokens.length,
-                uploadedBy: userId,
             });
             
             // Then import the tokens linked to this file
             await bulkImport({ 
                 projectId,
-                userId,
+                tenantId: effectiveTenantId,
+                userId: effectiveUserId,
                 tokens: previewTokens,
                 sourceFileId: fileId,
                 clearExisting: false 
@@ -524,9 +543,9 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleFileRename = async (fileId: Id<"tokenFiles">) => {
-        if (!projectId || !editingFileName.trim()) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId || !editingFileName.trim()) return;
         try {
-            await renameFile({ id: fileId, projectId, name: editingFileName.trim() });
+            await renameFile({ id: fileId, tenantId: effectiveTenantId, userId: effectiveUserId, name: editingFileName.trim() });
             setEditingFileId(null);
             setEditingFileName('');
         } catch (error) {
@@ -535,19 +554,19 @@ export const TokenManager: React.FC = () => {
     };
 
     const handleFileToggle = async (fileId: Id<"tokenFiles">) => {
-        if (!projectId) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId) return;
         try {
-            await toggleFileActive({ id: fileId, projectId });
+            await toggleFileActive({ id: fileId, tenantId: effectiveTenantId, userId: effectiveUserId });
         } catch (error) {
             console.error('Failed to toggle file:', error);
         }
     };
 
     const handleFileDelete = async (fileId: Id<"tokenFiles">) => {
-        if (!projectId) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId) return;
         if (!confirm('Delete this file and all its tokens?')) return;
         try {
-            await removeFile({ id: fileId, projectId });
+            await removeFile({ id: fileId, tenantId: effectiveTenantId, userId: effectiveUserId });
         } catch (error) {
             console.error('Failed to delete file:', error);
             }

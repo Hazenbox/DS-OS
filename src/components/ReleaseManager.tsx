@@ -4,16 +4,37 @@ import { api } from '../../convex/_generated/api';
 import { DeploymentStatus, convexComponentToLegacy } from '../types';
 import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { useTenant } from '../contexts/TenantContext';
 import { CardSkeleton, TableSkeleton } from './LoadingSpinner';
 
 export const ReleaseManager: React.FC = () => {
-    const { projectId, userId } = useProject();
+    const { projectId, tenantId, userId } = useProject();
+    const { tenantId: tenantIdFromContext, userId: userIdFromContext } = useTenant();
+    
+    // Use tenantId and userId from TenantContext (more reliable)
+    const effectiveTenantId = tenantIdFromContext || tenantId;
+    const effectiveUserId = userIdFromContext || userId;
     const [activeDeploy, setActiveDeploy] = useState<DeploymentStatus[] | null>(null);
 
-    // Convex queries - scoped to project
-    const convexComponents = useQuery(api.components.list, projectId ? { projectId } : "skip");
-    const releases = useQuery(api.releases.list, projectId ? { projectId } : "skip");
-    const latestRelease = useQuery(api.releases.latest, projectId ? { projectId } : "skip");
+    // Convex queries - scoped to tenant and project
+    const convexComponents = useQuery(
+        api.components.list, 
+        projectId && effectiveTenantId && effectiveUserId 
+            ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    );
+    const releases = useQuery(
+        api.releases.list, 
+        projectId && effectiveTenantId && effectiveUserId 
+            ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    );
+    const latestRelease = useQuery(
+        api.releases.latest, 
+        projectId && effectiveTenantId && effectiveUserId 
+            ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    );
 
     // Loading state
     const isLoading = (convexComponents === undefined || releases === undefined) && projectId;
@@ -40,9 +61,12 @@ export const ReleaseManager: React.FC = () => {
 
         // Create release record
         try {
+            if (!effectiveTenantId || !effectiveUserId) return;
+            
             const releaseId = await createRelease({
                 projectId,
-                userId: userId || '',
+                tenantId: effectiveTenantId,
+                userId: effectiveUserId,
                 version: newVersion,
                 changelog: generateChangelog(),
                 components: components.map(c => c.id),
@@ -54,7 +78,9 @@ export const ReleaseManager: React.FC = () => {
                 if (currentStep >= steps.length) {
                     clearInterval(interval);
                     // Mark release as published
-                    updateReleaseStatus({ id: releaseId, status: 'published', userId: userId || '' });
+                    if (effectiveTenantId && effectiveUserId) {
+                        updateReleaseStatus({ id: releaseId, tenantId: effectiveTenantId, userId: effectiveUserId, status: 'published' });
+                    }
                     return;
                 }
 

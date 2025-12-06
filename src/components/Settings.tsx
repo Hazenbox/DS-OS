@@ -4,6 +4,7 @@ import { api } from '../../convex/_generated/api';
 import { Moon, Sun, Monitor, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ThemeMode } from '../App';
 import { useProject } from '../contexts/ProjectContext';
+import { useTenant } from '../contexts/TenantContext';
 
 interface SettingsProps {
     themeMode: ThemeMode;
@@ -55,7 +56,12 @@ const ThemeSwitcher: React.FC<{
 };
 
 export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, onThemeModeChange }) => {
-    const { userId, projectId } = useProject();
+    const { userId, tenantId, projectId } = useProject();
+    const { tenantId: tenantIdFromContext, userId: userIdFromContext } = useTenant();
+    
+    // Use tenantId and userId from TenantContext (more reliable)
+    const effectiveTenantId = tenantIdFromContext || tenantId;
+    const effectiveUserId = userIdFromContext || userId;
     
     const [geminiKey, setGeminiKey] = useState('');
     const [showGeminiKey, setShowGeminiKey] = useState(false);
@@ -78,11 +84,21 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     const [isClearing, setIsClearing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-    // Convex - scoped to user
+    // Convex - scoped to tenant
     const setThemeSetting = useMutation(api.settings.set);
     const setSetting = useMutation(api.settings.set);
-    const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
-    const claudeKeyStatus = useQuery(api.settings.get, userId ? { userId, key: 'claudeApiKey' } : "skip");
+    const figmaPatStatus = useQuery(
+        api.figma.getFigmaPatStatus, 
+        effectiveTenantId && effectiveUserId 
+            ? { tenantId: effectiveTenantId, userId: effectiveUserId } 
+            : "skip"
+    );
+    const claudeKeyStatus = useQuery(
+        api.settings.get, 
+        effectiveTenantId && effectiveUserId 
+            ? { tenantId: effectiveTenantId, userId: effectiveUserId, key: 'claudeApiKey' } 
+            : "skip"
+    );
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
     const clearProjectData = useMutation(api.seed.clearProjectData);
 
@@ -105,11 +121,11 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     };
 
     const handleSaveFigmaPat = async () => {
-        if (!figmaPat.trim() || !userId) return;
+        if (!figmaPat.trim() || !effectiveTenantId || !effectiveUserId) return;
         
         setIsFigmaSaving(true);
         try {
-            await saveFigmaPat({ userId, pat: figmaPat });
+            await saveFigmaPat({ tenantId: effectiveTenantId, userId: effectiveUserId, pat: figmaPat });
             setFigmaSaved(true);
             setFigmaPat(''); // Clear input after saving
             setTimeout(() => setFigmaSaved(false), 2000);
@@ -121,11 +137,11 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     };
 
     const handleSaveClaudeKey = async () => {
-        if (!claudeKey.trim() || !userId) return;
+        if (!claudeKey.trim() || !effectiveTenantId || !effectiveUserId) return;
         
         setIsClaudeSaving(true);
         try {
-            await setSetting({ userId, key: 'claudeApiKey', value: claudeKey });
+            await setSetting({ tenantId: effectiveTenantId, userId: effectiveUserId, key: 'claudeApiKey', value: claudeKey });
             setClaudeSaved(true);
             setClaudeKey(''); // Clear input after saving
             setTimeout(() => setClaudeSaved(false), 2000);
@@ -473,7 +489,9 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                             if (!projectId) return;
                                             setIsClearing(true);
                                             try {
-                                                await clearProjectData({ projectId });
+                                                if (effectiveTenantId && effectiveUserId) {
+                                                    await clearProjectData({ projectId, tenantId: effectiveTenantId, userId: effectiveUserId });
+                                                }
                                                 setShowClearConfirm(false);
                                             } catch (error) {
                                                 console.error('Failed to clear data:', error);

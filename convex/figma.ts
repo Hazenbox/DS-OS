@@ -559,17 +559,22 @@ export default ${name};
   },
 });
 
-// Store Figma PAT securely - scoped to user
+// Store Figma PAT securely - scoped to tenant
 export const setFigmaPat = mutation({
   args: { 
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     pat: v.string() 
   },
   handler: async (ctx, args) => {
+    // Verify tenant access
+    const { getTenantContext } = await import("./tenantMiddleware");
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_user_key", (q) => 
-        q.eq("userId", args.userId).eq("key", "figma_pat")
+      .withIndex("by_tenant_key", (q) => 
+        q.eq("tenantId", args.tenantId).eq("key", "figma_pat")
       )
       .first();
     
@@ -577,7 +582,8 @@ export const setFigmaPat = mutation({
       await ctx.db.patch(existing._id, { value: args.pat });
     } else {
       await ctx.db.insert("settings", {
-        userId: args.userId,
+        tenantId: args.tenantId,
+        userId: args.userId, // Keep for backward compatibility
         key: "figma_pat",
         value: args.pat,
       });
@@ -587,21 +593,21 @@ export const setFigmaPat = mutation({
   },
 });
 
-// Get Figma PAT status (masked) - scoped to user
+// Get Figma PAT status (masked) - scoped to tenant
 export const getFigmaPatStatus = query({
   args: {
-    userId: v.optional(v.string()),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId;
-    if (!userId) {
-      return { configured: false, masked: null };
-    }
+    // Verify tenant access
+    const { getTenantContext } = await import("./tenantMiddleware");
+    await getTenantContext(ctx, args.userId, args.tenantId);
     
     const setting = await ctx.db
       .query("settings")
-      .withIndex("by_user_key", (q) => 
-        q.eq("userId", userId).eq("key", "figma_pat")
+      .withIndex("by_tenant_key", (q) => 
+        q.eq("tenantId", args.tenantId).eq("key", "figma_pat")
       )
       .first();
     

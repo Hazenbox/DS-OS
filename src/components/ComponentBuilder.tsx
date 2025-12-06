@@ -11,6 +11,7 @@ import {
   AlertCircle, RefreshCw
 } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { useTenant } from '../contexts/TenantContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { 
   SandpackProvider, 
@@ -718,7 +719,12 @@ const ApiKeySetup: React.FC<{
 // ============================================================================
 
 export const ComponentBuilder: React.FC = () => {
-  const { projectId, userId } = useProject();
+  const { projectId, tenantId, userId } = useProject();
+  const { tenantId: tenantIdFromContext, userId: userIdFromContext } = useTenant();
+  
+  // Use tenantId and userId from TenantContext (more reliable)
+  const effectiveTenantId = tenantIdFromContext || tenantId;
+  const effectiveUserId = userIdFromContext || userId;
   
   // State
   const [figmaUrl, setFigmaUrl] = useState('');
@@ -731,11 +737,31 @@ export const ComponentBuilder: React.FC = () => {
   const [isRefining, setIsRefining] = useState(false);
   
   // Convex queries
-  const convexTokens = useQuery(api.tokens.list, projectId ? { projectId } : "skip");
+  const convexTokens = useQuery(
+    api.tokens.list, 
+    projectId && effectiveTenantId && effectiveUserId 
+      ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+      : "skip"
+  );
   const tokens = (convexTokens || []).map(convexTokenToLegacy);
-  const components = useQuery(api.components.list, projectId ? { projectId } : "skip");
-  const apiKeyStatus = useQuery(api.settings.get, userId ? { userId, key: 'claudeApiKey' } : "skip");
-  const figmaPatStatus = useQuery(api.figma.getFigmaPatStatus, userId ? { userId } : "skip");
+  const components = useQuery(
+    api.components.list, 
+    projectId && effectiveTenantId && effectiveUserId 
+      ? { projectId, tenantId: effectiveTenantId, userId: effectiveUserId } 
+      : "skip"
+  );
+  const apiKeyStatus = useQuery(
+    api.settings.get, 
+    effectiveTenantId && effectiveUserId 
+      ? { tenantId: effectiveTenantId, userId: effectiveUserId, key: 'claudeApiKey' } 
+      : "skip"
+  );
+  const figmaPatStatus = useQuery(
+    api.figma.getFigmaPatStatus, 
+    effectiveTenantId && effectiveUserId 
+      ? { tenantId: effectiveTenantId, userId: effectiveUserId } 
+      : "skip"
+  );
   
   const isLoading = components === undefined && projectId;
   
@@ -789,7 +815,7 @@ export const ComponentBuilder: React.FC = () => {
   
   // Handle extraction
   const handleExtract = async () => {
-    if (!figmaUrl.trim() || !projectId || !userId || !canExtract) return;
+    if (!figmaUrl.trim() || !projectId || !effectiveTenantId || !effectiveUserId || !canExtract) return;
     
     setIsExtracting(true);
     setExtractionError(null);
@@ -797,7 +823,8 @@ export const ComponentBuilder: React.FC = () => {
     try {
       const result = await extractAndBuild({
         projectId,
-        userId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
         figmaUrl,
       });
       
@@ -820,6 +847,8 @@ export const ComponentBuilder: React.FC = () => {
     try {
       const newId = await createComponent({
         projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
         name: extractedResult.name,
         status: 'draft',
         version: '1.0.0',
@@ -837,7 +866,7 @@ export const ComponentBuilder: React.FC = () => {
   // Handle delete component
   const handleDeleteComponent = async (id: Id<"components">) => {
     try {
-      await removeComponent({ id });
+      await removeComponent({ id, tenantId: effectiveTenantId!, userId: effectiveUserId! });
       if (selectedComponentId === id) {
         setSelectedComponentId(null);
       }
