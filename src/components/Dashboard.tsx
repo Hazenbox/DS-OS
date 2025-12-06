@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { convexComponentToLegacy, convexActivityToLegacy } from '../types';
-import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Plus, Edit2, Trash2, Download, Upload, Rocket } from 'lucide-react';
+import { CheckCircle, GitBranch, Package, Palette, Clock, ChevronRight, Plus, Edit2, Trash2, Download, Upload, Rocket, Filter } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { useTenant } from '../contexts/TenantContext';
 import { CardSkeleton, TimelineSkeleton } from './LoadingSpinner';
@@ -132,6 +132,8 @@ const ActivityItem: React.FC<{
 export const Dashboard: React.FC = () => {
   const { projectId } = useProject();
   const [activityFilter, setActivityFilter] = useState<string>('all');
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const filterMenuRef = React.useRef<HTMLDivElement>(null);
   
   // Get real data from Convex - scoped to project
   const { tenantId, userId } = useTenant();
@@ -196,6 +198,20 @@ export const Dashboard: React.FC = () => {
     { id: 'component', label: 'Components' },
     { id: 'release', label: 'Releases' },
   ];
+
+  // Close filter menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+
+    if (isFilterMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isFilterMenuOpen]);
 
   return (
     <div className="flex h-full">
@@ -290,31 +306,51 @@ export const Dashboard: React.FC = () => {
       <div className="w-80 border-l border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 flex flex-col h-full">
         {/* Panel Header */}
         <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock size={16} className="text-zinc-400" />
               <h3 className="font-semibold text-sm text-zinc-900 dark:text-white">Activity</h3>
             </div>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
-              {filteredActivity.length}
-            </span>
-          </div>
-          
-          {/* Filter Pills */}
-          <div className="flex gap-1.5 flex-wrap">
-            {filterOptions.map(option => (
-              <button
-                key={option.id}
-                onClick={() => setActivityFilter(option.id)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  activityFilter === option.id
-                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                {filteredActivity.length}
+              </span>
+              {/* Filter Button */}
+              <div className="relative" ref={filterMenuRef}>
+                <button
+                  onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                  className={`h-8 w-8 flex items-center justify-center rounded-md transition-colors ${
+                    activityFilter !== 'all'
+                      ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <Filter size={16} />
+                </button>
+                
+                {/* Filter Menu */}
+                {isFilterMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1">
+                    {filterOptions.map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => {
+                          setActivityFilter(option.id);
+                          setIsFilterMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 h-8 flex items-center text-sm transition-colors ${
+                          activityFilter === option.id
+                            ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 font-medium'
+                            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
