@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { X, Loader2, FolderPlus, AlertCircle } from 'lucide-react';
 
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userId: string;
+  tenantId: Id<"tenants">;
+  userId: Id<"users">;
 }
 
-export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, userId }) => {
+export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, tenantId, userId }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +45,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, use
       await createProject({
         name: name.trim(),
         description: description.trim() || undefined,
+        tenantId,
         userId,
       });
       onClose();

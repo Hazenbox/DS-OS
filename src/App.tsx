@@ -10,11 +10,13 @@ import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
 import { ProjectModal } from './components/ProjectModal';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
+import { TenantProvider, useTenant } from './contexts/TenantContext';
 import { ViewState } from './types';
-import { BookOpen, MessageSquare, FolderOpen, Plus } from 'lucide-react';
+import { BookOpen, MessageSquare, FolderOpen, Plus, Building2 } from 'lucide-react';
+import { Id } from '../convex/_generated/dataModel';
 
 interface User {
-  userId: string;
+  userId: string; // This is the Convex user ID (Id<"users">)
   email: string;
   name?: string;
   image?: string;
@@ -56,7 +58,7 @@ const getViewFromPath = (): ViewState => {
   return 'dashboard';
 };
 
-// Inner app component that uses project context
+// Inner app component that uses tenant and project context
 const AppContent: React.FC<{
   user: User;
   onLogout: () => void;
@@ -66,7 +68,9 @@ const AppContent: React.FC<{
 }> = ({ user, onLogout, themeMode, resolvedTheme, onThemeModeChange }) => {
   const [currentView, setCurrentView] = useState<ViewState>(getViewFromPath());
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const { activeProject, projectId, isLoading, userId } = useProject();
+  const [showTenantModal, setShowTenantModal] = useState(false);
+  const { activeTenant, tenantId, isLoading: isTenantLoading, switchTenant } = useTenant();
+  const { activeProject, projectId, isLoading: isProjectLoading } = useProject();
 
   // Handle view change and update URL
   const handleViewChange = (view: ViewState) => {
@@ -95,8 +99,39 @@ const AppContent: React.FC<{
   }, []);
 
   const renderView = () => {
+    // Show "no tenant" state if no active tenant
+    if (!tenantId && !isTenantLoading) {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div>
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
+                Get Started
+              </h2>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400">
+            <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-3">
+              <Building2 size={24} className="text-violet-500" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-sm font-medium text-zinc-900 dark:text-white mb-1">Create Your First Workspace</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+              A workspace is where you organize your design system projects.
+            </p>
+            <button
+              onClick={() => setShowTenantModal(true)}
+              className="flex items-center gap-1.5 px-3 h-8 bg-violet-600 text-white rounded-md text-xs font-medium hover:bg-violet-700 transition-colors"
+            >
+              <Plus size={14} />
+              Create Workspace
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
     // Show "no project" state if no active project
-    if (!projectId && !isLoading) {
+    if (!projectId && !isProjectLoading && tenantId) {
       return (
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
@@ -194,12 +229,31 @@ const AppContent: React.FC<{
         </div>
       </div>
       
+      {/* Tenant Creation Modal - TODO: Create TenantModal component */}
+      {showTenantModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-zinc-900 dark:text-white">Create Workspace</h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+              Workspace creation UI coming soon. For now, a personal workspace will be created automatically.
+            </p>
+            <button
+              onClick={() => setShowTenantModal(false)}
+              className="px-4 py-2 bg-violet-600 text-white rounded-md text-sm font-medium hover:bg-violet-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Project Creation Modal */}
-      {userId && (
+      {tenantId && (
         <ProjectModal
           isOpen={showProjectModal}
           onClose={() => setShowProjectModal(false)}
-          userId={userId}
+          tenantId={tenantId}
+          userId={user.userId as Id<"users">}
         />
       )}
     </>
@@ -322,16 +376,21 @@ const App: React.FC = () => {
     return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignup={() => setAuthView('signup')} />;
   }
 
+  // Get Convex user ID from stored user
+  const convexUserId = user.userId as Id<"users">;
+  
   return (
-    <ProjectProvider userId={user.email}>
-      <AppContent 
-        user={user} 
-        onLogout={handleLogout}
-        themeMode={themeMode}
-        resolvedTheme={resolvedTheme}
-        onThemeModeChange={handleThemeModeChange}
-      />
-    </ProjectProvider>
+    <TenantProvider userId={convexUserId}>
+      <ProjectProvider>
+        <AppContent 
+          user={user} 
+          onLogout={handleLogout}
+          themeMode={themeMode}
+          resolvedTheme={resolvedTheme}
+          onThemeModeChange={handleThemeModeChange}
+        />
+      </ProjectProvider>
+    </TenantProvider>
   );
 };
 
