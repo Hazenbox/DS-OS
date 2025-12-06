@@ -34,7 +34,7 @@ export async function getTenantContext(
   if (tenantId) {
     const tenantUser = await ctx.db
       .query("tenantUsers")
-      .withIndex("by_tenant_user", (q) =>
+      .withIndex("by_tenant_user", (q: any) =>
         q.eq("tenantId", tenantId).eq("userId", userId)
       )
       .first();
@@ -67,7 +67,7 @@ export async function requireRole(
 ): Promise<void> {
   const tenantUser = await ctx.db
     .query("tenantUsers")
-    .withIndex("by_tenant_user", (q) =>
+    .withIndex("by_tenant_user", (q: any) =>
       q.eq("tenantId", tenantId).eq("userId", userId)
     )
     .first();
@@ -87,7 +87,7 @@ export async function requireRole(
   };
 
   const userMaxRole = Math.max(
-    ...tenantUser.roles.map((r) => roleHierarchy[r] || 0)
+    ...tenantUser.roles.map((r: string) => roleHierarchy[r] || 0)
   );
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
@@ -102,13 +102,20 @@ export async function requireRole(
  * Verify tenant access to a resource
  * Ensures the resource belongs to the tenant
  */
-export async function verifyTenantResource<T extends { tenantId: Id<"tenants"> }>(
+export async function verifyTenantResource<T extends { tenantId?: Id<"tenants"> }>(
   ctx: any,
   tenantId: Id<"tenants">,
   resource: T | null
 ): Promise<T> {
   if (!resource) {
     throw new Error("Resource not found");
+  }
+
+  // If resource doesn't have tenantId yet (migration pending), allow access
+  // This is temporary until migration is complete
+  if (!resource.tenantId) {
+    console.warn("Resource missing tenantId - migration may be needed");
+    return resource;
   }
 
   if (resource.tenantId !== tenantId) {
@@ -128,8 +135,8 @@ export async function getActiveTenantForUser(
 ): Promise<Id<"tenants"> | null> {
   const tenantUser = await ctx.db
     .query("tenantUsers")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .filter((q) => q.eq(q.field("isActive"), true))
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .filter((q: any) => q.eq(q.field("isActive"), true))
     .first();
 
   if (!tenantUser) {
@@ -163,10 +170,10 @@ export async function createPersonalTenant(
   const tenantSlug = `personal-${userId.replace(":", "-")}`;
 
   // Check if personal tenant already exists
-  const existing = await ctx.db
-    .query("tenants")
-    .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
-    .first();
+    const existing = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q: any) => q.eq("slug", tenantSlug))
+      .first();
 
   if (existing) {
     return existing._id;

@@ -152,7 +152,7 @@ export default defineSchema({
 
   // Token Files - JSON files uploaded by users
   tokenFiles: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.id("projects"),
     name: v.string(), // Display name (editable)
     originalName: v.string(), // Original filename
@@ -169,7 +169,7 @@ export default defineSchema({
 
   // Design Tokens - scoped to project
   tokens: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.id("projects"),
     name: v.string(),
     value: v.string(),
@@ -197,7 +197,7 @@ export default defineSchema({
 
   // Components - scoped to project
   components: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.id("projects"),
     name: v.string(),
     status: v.union(
@@ -218,7 +218,7 @@ export default defineSchema({
 
   // Activity Log - scoped to project
   activity: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.optional(v.id("projects")), // Optional for system-wide activity
     user: v.string(),
     action: v.union(
@@ -244,7 +244,7 @@ export default defineSchema({
 
   // Settings - scoped to tenant (migrated from user-scoped)
   settings: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     userId: v.optional(v.string()), // Owner's email (optional for legacy data)
     key: v.string(),
     value: v.string(),
@@ -257,7 +257,7 @@ export default defineSchema({
 
   // Releases - scoped to project
   releases: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.id("projects"),
     version: v.string(),
     status: v.union(
@@ -278,7 +278,7 @@ export default defineSchema({
 
   // Brands - scoped to project
   brands: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.optional(v.id("projects")),
     name: v.string(),
     isDefault: v.boolean(),
@@ -289,7 +289,7 @@ export default defineSchema({
 
   // Projects - scoped to tenant
   projects: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     name: v.string(),
     description: v.optional(v.string()),
     isActive: v.boolean(),
@@ -358,7 +358,7 @@ export default defineSchema({
 
   // Figma Extractions - stores extraction requests and results
   figmaExtractions: defineTable({
-    tenantId: v.id("tenants"), // NEW: Tenant isolation
+    tenantId: v.optional(v.id("tenants")), // Optional temporarily for migration
     projectId: v.id("projects"),
     userId: v.string(),
     figmaUrl: v.optional(v.string()),

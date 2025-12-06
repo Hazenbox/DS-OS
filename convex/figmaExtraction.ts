@@ -5,13 +5,15 @@ import { mutation, query } from "./_generated/server";
 export const createExtractionRequest = mutation({
   args: {
     projectId: v.id("projects"),
-    userId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
     figmaUrl: v.optional(v.string()),
     nodeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const requestId = await ctx.db.insert("figmaExtractions", {
       projectId: args.projectId,
+      tenantId: args.tenantId,
       userId: args.userId,
       figmaUrl: args.figmaUrl,
       nodeId: args.nodeId,

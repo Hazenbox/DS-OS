@@ -17,7 +17,7 @@ async function verifyTenantAccess(
 ): Promise<Id<"tenantUsers">> {
   const tenantUser = await ctx.db
     .query("tenantUsers")
-    .withIndex("by_tenant_user", (q) =>
+    .withIndex("by_tenant_user", (q: any) =>
       q.eq("tenantId", tenantId).eq("userId", userId)
     )
     .first();
@@ -40,7 +40,7 @@ async function hasRole(
 ): Promise<boolean> {
   const tenantUser = await ctx.db
     .query("tenantUsers")
-    .withIndex("by_tenant_user", (q) =>
+    .withIndex("by_tenant_user", (q: any) =>
       q.eq("tenantId", tenantId).eq("userId", userId)
     )
     .first();
@@ -60,7 +60,7 @@ async function hasRole(
   };
 
   const userMaxRole = Math.max(
-    ...tenantUser.roles.map((r) => roleHierarchy[r] || 0)
+    ...tenantUser.roles.map((r: string) => roleHierarchy[r] || 0)
   );
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
@@ -325,7 +325,7 @@ export const inviteUser = mutation({
     // Check if already a member
     const existing = await ctx.db
       .query("tenantUsers")
-      .withIndex("by_tenant_user", (q) =>
+      .withIndex("by_tenant_user", (q: any) =>
         q.eq("tenantId", args.tenantId).eq("userId", user._id)
       )
       .first();
@@ -378,7 +378,7 @@ export const updateUserRoles = mutation({
 
     const tenantUser = await ctx.db
       .query("tenantUsers")
-      .withIndex("by_tenant_user", (q) =>
+      .withIndex("by_tenant_user", (q: any) =>
         q.eq("tenantId", args.tenantId).eq("userId", args.targetUserId)
       )
       .first();
@@ -418,7 +418,7 @@ export const removeUser = mutation({
 
     const tenantUser = await ctx.db
       .query("tenantUsers")
-      .withIndex("by_tenant_user", (q) =>
+      .withIndex("by_tenant_user", (q: any) =>
         q.eq("tenantId", args.tenantId).eq("userId", args.targetUserId)
       )
       .first();
