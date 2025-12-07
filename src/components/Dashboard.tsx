@@ -214,7 +214,7 @@ export const Dashboard: React.FC = () => {
     <div className="flex h-full">
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+        <div className="h-16 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
             <div>
             <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Overview</h2>
             </div>

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { DeploymentStatus, convexComponentToLegacy } from '../types';
-import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package } from 'lucide-react';
+import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package, Eye } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { useTenant } from '../contexts/TenantContext';
 import { CardSkeleton, TableSkeleton } from './LoadingSpinner';
+import { ApprovalWorkflow } from './ApprovalWorkflow';
+import { Id } from '../../convex/_generated/dataModel';
 
 export const ReleaseManager: React.FC = () => {
     const { projectId, tenantId, userId } = useProject();
@@ -15,6 +17,7 @@ export const ReleaseManager: React.FC = () => {
     const effectiveTenantId = tenantIdFromContext || tenantId;
     const effectiveUserId = userIdFromContext || userId;
     const [activeDeploy, setActiveDeploy] = useState<DeploymentStatus[] | null>(null);
+    const [showApprovalWorkflow, setShowApprovalWorkflow] = useState<Id<"releases"> | null>(null);
 
     // Convex queries - scoped to tenant and project
     const convexComponents = useQuery(
@@ -158,7 +161,7 @@ export const ReleaseManager: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div className="h-16 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Release</h2>
                 </div>
@@ -218,7 +221,7 @@ export const ReleaseManager: React.FC = () => {
                     {/* Release History */}
                     {releases && releases.length > 0 && (
                         <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
-                            <div className="px-6 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50">
+                            <div className="h-16 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50 flex items-center">
                                 <h3 className="text-sm font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
                                     <Package size={14} /> Release History
                                 </h3>
@@ -237,12 +240,23 @@ export const ReleaseManager: React.FC = () => {
                                                 {release.status}
                                             </span>
                                         </div>
-                                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                                            {release.publishedAt 
-                                                ? new Date(release.publishedAt).toLocaleDateString()
-                                                : 'Pending'
-                                            }
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {release.status === 'in_progress' && (
+                                                <button
+                                                    onClick={() => setShowApprovalWorkflow(release._id)}
+                                                    className="h-7 px-3 text-xs font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 rounded hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors flex items-center gap-1.5"
+                                                >
+                                                    <Eye size={12} />
+                                                    Review
+                                                </button>
+                                            )}
+                                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                                {release.publishedAt 
+                                                    ? new Date(release.publishedAt).toLocaleDateString()
+                                                    : 'Pending'
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -250,7 +264,7 @@ export const ReleaseManager: React.FC = () => {
                     )}
 
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50">
+                        <div className="h-16 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-800/50 flex items-center">
                             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Changelog Preview</h3>
                         </div>
                         <div className="p-6 font-mono text-sm text-zinc-500 dark:text-zinc-400 space-y-2">
@@ -269,6 +283,24 @@ export const ReleaseManager: React.FC = () => {
                 </div>
                 )}
             </div>
+            
+            {/* Approval Workflow Modal */}
+            {showApprovalWorkflow && (
+                <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-900">
+                    <ApprovalWorkflow
+                        releaseId={showApprovalWorkflow}
+                        onApprove={() => {
+                            setShowApprovalWorkflow(null);
+                            // Release status updated by approveRelease mutation
+                        }}
+                        onReject={(reason) => {
+                            setShowApprovalWorkflow(null);
+                            // Component rejection handled by rejectComponent mutation
+                        }}
+                        onClose={() => setShowApprovalWorkflow(null)}
+                    />
+                </div>
+            )}
         </div>
     );
 };

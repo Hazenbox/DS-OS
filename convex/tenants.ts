@@ -179,6 +179,32 @@ export const getBySlug = query({
 });
 
 /**
+ * Get tenant by slug (public - for SSO login)
+ */
+export const getBySlugPublic = query({
+  args: {
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+
+    if (!tenant || tenant.status !== "active") {
+      return null;
+    }
+
+    return {
+      _id: tenant._id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+    };
+  },
+});
+
+/**
  * List tenants for a user
  */
 export const list = query({

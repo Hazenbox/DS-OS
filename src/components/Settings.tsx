@@ -5,6 +5,7 @@ import { Moon, Sun, Monitor, Database, Key, Github, ExternalLink, Check, Loader2
 import { ThemeMode } from '../App';
 import { useProject } from '../contexts/ProjectContext';
 import { useTenant } from '../contexts/TenantContext';
+import { SSOConfig } from './SSOConfig';
 
 interface SettingsProps {
     themeMode: ThemeMode;
@@ -163,7 +164,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
 
     return (
         <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
+            <div className="h-16 px-6 border-b border-zinc-200/60 dark:border-zinc-800/60 flex justify-between items-center bg-white dark:bg-zinc-900 z-10">
                 <div>
                     <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Settings</h2>
                 </div>
@@ -386,6 +387,14 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                             </div>
                         </div>
                     </div>
+
+                    {/* SSO Configuration */}
+                    {effectiveTenantId && effectiveUserId && (
+                        <SSOConfig 
+                            tenantId={effectiveTenantId} 
+                            userId={effectiveUserId} 
+                        />
+                    )}
 
                     {/* Database Status */}
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-lg p-6">

@@ -3,6 +3,12 @@
 import { v } from "convex/values";
 import { action, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { extractIRS } from "./irsExtraction";
+import { extractIRT } from "./irtExtraction";
+import { classifyComponent } from "./componentIntelligence";
+import { extractIML } from "./imlExtraction";
+import { generateComponentCode } from "./codeGenerator";
+import { IRS, IRT, IML } from "../src/types/ir";
 
 // ============================================================================
 // TYPES
@@ -58,6 +64,9 @@ interface ExtractedComponent {
   }>;
   extractedProperties: Record<string, any>;
   usedVariables: Array<{ name: string; value: string; type?: string }>;
+  irs?: IRS; // Structure IR
+  irt?: IRT; // Token IR
+  iml?: IML; // Interaction Model IR
 }
 
 // ============================================================================
@@ -305,10 +314,14 @@ async function generateComponentWithClaude(
   extractedProps: Record<string, any>,
   variants: Array<{ name: string; properties: Record<string, string> }>,
   usedVariables: Array<{ name: string; value: string; type?: string }>,
-  claudeApiKey: string
+  claudeApiKey: string,
+  irs?: IRS,
+  irt?: IRT,
+  iml?: IML
 ): Promise<{ code: string; css: string }> {
   
-  const prompt = `You are an expert React/TypeScript developer. Generate a production-ready React component based on this Figma design data.
+  // Build enhanced prompt with IRS/IRT data
+  let prompt = `You are an expert React/TypeScript developer. Generate a production-ready React component based on this Figma design data.
 
 ## Component Name: ${componentName}
 
@@ -319,15 +332,50 @@ ${JSON.stringify(extractedProps, null, 2)}
 ${variants.slice(0, 10).map(v => `- ${v.name}: ${JSON.stringify(v.properties)}`).join('\n')}
 
 ## Design Variables Used:
-${usedVariables.map(v => `- ${v.name}: ${v.value} (${v.type})`).join('\n')}
+${usedVariables.map(v => `- ${v.name}: ${v.value} (${v.type})`).join('\n')}`;
 
-## Requirements:
+  // Add IRS data if available
+  if (irs) {
+    prompt += `\n\n## Structure IR (IRS):
+- Component Type: ${irs.meta.componentType}
+- Nodes: ${irs.tree.length} total
+- Slots: ${irs.slots.map(s => s.name).join(', ')}
+- Layout Intent: ${irs.layoutIntent.horizontal}/${irs.layoutIntent.vertical}
+- Variants: ${irs.variants.length} total
+- State Mapping: ${irs.stateMapping?.map(s => `${s.figmaVariant} → ${s.semanticState}`).join(', ')}`;
+  }
+
+  // Add IRT data if available
+  if (irt) {
+    prompt += `\n\n## Token IR (IRT):
+- Tokens: ${irt.tokens.length} total
+- Modes: ${Object.keys(irt.modeValues).join(', ')}
+- Token Names: ${irt.tokens.slice(0, 10).map(t => t.name).join(', ')}`;
+  }
+
+  // Add IML data if available
+  if (iml) {
+    prompt += `\n\n## Interaction Model IR (IML):
+- Component Category: ${iml.componentCategory}
+- States: ${iml.states.map(s => s.name).join(', ')}
+- ARIA Role: ${iml.aria.role || 'none'}
+- Keyboard Mappings: ${iml.keyboard.length} total (${iml.keyboard.slice(0, 5).map(k => k.key).join(', ')})
+- Required Primitives: ${iml.requiredPrimitives?.join(', ') || 'none'}
+- Interaction Rules: ${iml.interactions.length} total`;
+  }
+
+  prompt += `\n\n## Requirements:
 1. Create a TypeScript React functional component
-2. Use CSS variables for design tokens where appropriate
+2. Use CSS variables for design tokens where appropriate (reference IRT tokens)
 3. Support all variant properties as props
 4. Include proper TypeScript types
 5. Make it production-ready with proper accessibility attributes
 6. Use CSS modules or inline styles that match the Figma design exactly
+7. ${irs?.slots.length ? `Support slots: ${irs.slots.map(s => s.name).join(', ')}` : ''}
+8. ${irs?.stateMapping?.length ? `Support states: ${irs.stateMapping.map(s => s.semanticState).join(', ')}` : ''}
+9. ${iml ? `Use ${iml.componentCategory} component pattern with proper ARIA attributes (${iml.aria.role || 'none'})` : ''}
+10. ${iml?.requiredPrimitives?.length ? `Use these Radix UI primitives: ${iml.requiredPrimitives.join(', ')}` : ''}
+11. ${iml?.keyboard.length ? `Implement keyboard interactions: ${iml.keyboard.map(k => `${k.key} → ${k.action}`).join(', ')}` : ''}
 
 ## Output Format:
 Return ONLY valid JSON with this structure (no markdown, no explanation):
@@ -460,8 +508,23 @@ export const extractAndBuildComponent = action({
     }
     
     const variables = variablesResponse.meta?.variables || {};
+    const variableCollections = variablesResponse.meta?.variableCollections || {};
     
-    // Extract properties
+    // Extract IRS (Structure IR)
+    const irs = extractIRS(nodeData, args.figmaUrl, fileKey);
+    console.log(`Extracted IRS: ${irs.tree.length} nodes, ${irs.variants.length} variants, ${irs.slots.length} slots`);
+    
+    // Extract IRT (Token IR)
+    const allNodes = [nodeData, ...(nodeData.children || [])];
+    const irt = extractIRT(variables, variableCollections, allNodes);
+    console.log(`Extracted IRT: ${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
+    
+    // Classify component and extract IML (Interaction Model IR)
+    const componentIntelligence = classifyComponent(irs);
+    const iml = extractIML(irs, componentIntelligence);
+    console.log(`Classified as: ${componentIntelligence.category} (confidence: ${componentIntelligence.confidence}), IML: ${iml.states.length} states, ${iml.keyboard.length} keyboard mappings`);
+    
+    // Legacy extraction (for backward compatibility)
     const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
     const extractedProps = extractNodeProperties(nodeData);
     const variants = extractVariants(nodeData);
@@ -469,15 +532,59 @@ export const extractAndBuildComponent = action({
     
     console.log(`Extracted: ${componentName}, ${variants.length} variants, ${usedVariables.length} variables`);
     
-    // Generate code with Claude
-    const { code, css } = await generateComponentWithClaude(
-      componentName,
-      nodeData,
-      extractedProps,
-      variants,
-      usedVariables,
-      claudeApiKey
-    );
+    // Generate code using deterministic generator (primary method)
+    let generatedCode;
+    try {
+      generatedCode = generateComponentCode(componentName, irs, irt, iml);
+      console.log(`Generated code using deterministic templates`);
+    } catch (error) {
+      console.warn(`Deterministic generation failed, falling back to Claude:`, error);
+      generatedCode = null;
+    }
+    
+    // Fallback to Claude if deterministic generation fails or for enhancement
+    let code: string;
+    let css: string;
+    
+    if (generatedCode) {
+      // Use deterministic generator output
+      code = generatedCode.component;
+      css = generatedCode.styles;
+      
+      // Optionally enhance with Claude for polish
+      try {
+        const claudeEnhancement = await generateComponentWithClaude(
+          componentName,
+          nodeData,
+          extractedProps,
+          variants,
+          usedVariables,
+          claudeApiKey,
+          irs,
+          irt,
+          iml
+        );
+        // Merge or use Claude's output if it's better
+        // For now, we'll use deterministic output as primary
+      } catch (error) {
+        console.warn(`Claude enhancement failed, using deterministic output:`, error);
+      }
+    } else {
+      // Fallback to Claude-only generation
+      const claudeResult = await generateComponentWithClaude(
+        componentName,
+        nodeData,
+        extractedProps,
+        variants,
+        usedVariables,
+        claudeApiKey,
+        irs,
+        irt,
+        iml
+      );
+      code = claudeResult.code;
+      css = claudeResult.css;
+    }
     
     // Build variant CSS
     const variantCss = variants.slice(0, 10).map(v => {
@@ -497,6 +604,9 @@ export const extractAndBuildComponent = action({
       })),
       extractedProperties: extractedProps,
       usedVariables,
+      irs, // Include Structure IR
+      irt, // Include Token IR
+      iml, // Include Interaction Model IR
     };
   },
 });

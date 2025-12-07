@@ -112,22 +112,17 @@ export const ProjectManagement: React.FC<ProjectManagementProps> = ({ onProjectS
   return (
     <div className="h-screen w-full flex flex-col bg-white dark:bg-zinc-900">
       {/* Header */}
-      <div className="px-8 pt-8 pb-6 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Projects</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              Manage your design system projects
-            </p>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="h-8 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Plus size={16} />
-            Create Project
-          </button>
+      <div className="h-16 px-8 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Projects</h1>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="h-8 px-4 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+        >
+          <Plus size={16} />
+          Create Project
+        </button>
       </div>
 
       {/* Projects List */}

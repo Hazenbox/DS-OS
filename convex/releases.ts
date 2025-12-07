@@ -185,6 +185,199 @@ export const create = mutation({
 });
 
 // Update release status
+// Approve a component in a release
+export const approveComponent = mutation({
+  args: {
+    releaseId: v.id("releases"),
+    componentId: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
+    const release = await ctx.db.get(args.releaseId);
+    if (!release) {
+      throw new Error("Release not found");
+    }
+    
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, release);
+    
+    // Verify component is in release
+    if (!release.components.includes(args.componentId)) {
+      throw new Error("Component not found in release");
+    }
+    
+    // Get user email
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
+    // Update or create component approval
+    const approvals = release.componentApprovals || [];
+    const existingIndex = approvals.findIndex((a: any) => a.componentId === args.componentId);
+    
+    if (existingIndex >= 0) {
+      approvals[existingIndex] = {
+        componentId: args.componentId,
+        status: "approved",
+        approvedBy: userEmail,
+        approvedAt: Date.now(),
+        rejectedBy: undefined,
+        rejectedAt: undefined,
+        rejectionReason: undefined,
+      };
+    } else {
+      approvals.push({
+        componentId: args.componentId,
+        status: "approved",
+        approvedBy: userEmail,
+        approvedAt: Date.now(),
+      });
+    }
+    
+    await ctx.db.patch(args.releaseId, {
+      componentApprovals: approvals,
+    });
+    
+    // Log activity
+    await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
+      projectId: release.projectId,
+      user: userEmail,
+      action: "component_approved",
+      target: args.componentId,
+      targetType: "component",
+    });
+  },
+});
+
+// Reject a component in a release
+export const rejectComponent = mutation({
+  args: {
+    releaseId: v.id("releases"),
+    componentId: v.string(),
+    reason: v.string(),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
+    const release = await ctx.db.get(args.releaseId);
+    if (!release) {
+      throw new Error("Release not found");
+    }
+    
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, release);
+    
+    // Verify component is in release
+    if (!release.components.includes(args.componentId)) {
+      throw new Error("Component not found in release");
+    }
+    
+    // Get user email
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
+    // Update or create component approval
+    const approvals = release.componentApprovals || [];
+    const existingIndex = approvals.findIndex((a: any) => a.componentId === args.componentId);
+    
+    if (existingIndex >= 0) {
+      approvals[existingIndex] = {
+        componentId: args.componentId,
+        status: "rejected",
+        rejectedBy: userEmail,
+        rejectedAt: Date.now(),
+        rejectionReason: args.reason.trim(),
+        approvedBy: undefined,
+        approvedAt: undefined,
+      };
+    } else {
+      approvals.push({
+        componentId: args.componentId,
+        status: "rejected",
+        rejectedBy: userEmail,
+        rejectedAt: Date.now(),
+        rejectionReason: args.reason.trim(),
+      });
+    }
+    
+    await ctx.db.patch(args.releaseId, {
+      componentApprovals: approvals,
+    });
+    
+    // Log activity
+    await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
+      projectId: release.projectId,
+      user: userEmail,
+      action: "component_rejected",
+      target: args.componentId,
+      targetType: "component",
+    });
+  },
+});
+
+// Approve entire release (all components approved)
+export const approveRelease = mutation({
+  args: {
+    releaseId: v.id("releases"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Verify tenant access and require developer role
+    await getTenantContext(ctx, args.userId, args.tenantId);
+    await requireRole(ctx, args.tenantId, args.userId, "developer");
+    
+    const release = await ctx.db.get(args.releaseId);
+    if (!release) {
+      throw new Error("Release not found");
+    }
+    
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, args.tenantId, release);
+    
+    // Check if all components are approved
+    const approvals = release.componentApprovals || [];
+    const allApproved = release.components.every((compId: string) => {
+      const approval = approvals.find((a: any) => a.componentId === compId);
+      return approval?.status === "approved";
+    });
+    
+    if (!allApproved) {
+      throw new Error("All components must be approved before approving the release");
+    }
+    
+    // Update release status to published
+    await ctx.db.patch(args.releaseId, {
+      status: "published",
+      publishedAt: Date.now(),
+    });
+    
+    // Get user email for activity log
+    const user = await ctx.db.get(args.userId);
+    const userEmail = user?.email || "unknown";
+    
+    // Log activity
+    await ctx.db.insert("activity", {
+      tenantId: args.tenantId,
+      projectId: release.projectId,
+      user: userEmail,
+      action: "release_approved",
+      target: args.releaseId,
+      targetType: "release",
+    });
+  },
+});
+
 export const updateStatus = mutation({
   args: {
     id: v.id("releases"),

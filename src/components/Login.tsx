@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useMutation } from 'convex/react';
+import React, { useState, useEffect } from 'react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Loader2, AlertCircle, Eye, EyeOff, Github, Layers } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, EyeOff, Github, Layers, Shield } from 'lucide-react';
 import { signInWithGoogle, signInWithGitHub, isGoogleConfigured, isGitHubConfigured, OAuthUserInfo } from '../services/oauthService';
 
 interface LoginProps {
@@ -17,9 +17,29 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
+  const [isSSOLoading, setIsSSOLoading] = useState(false);
+  const [tenantSlug, setTenantSlug] = useState('');
 
   const login = useMutation(api.auth.login);
   const oauthLogin = useMutation(api.auth.oauthLogin);
+  const initiateSSO = useMutation(api.sso.oidc.initiateLogin);
+  
+  // Check for tenant slug in URL or localStorage
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const slug = urlParams.get('tenant') || localStorage.getItem('tenantSlug') || '';
+    setTenantSlug(slug);
+  }, []);
+
+  // Get tenant by slug and check if SSO is enabled
+  const getTenantBySlug = useQuery(
+    api.tenants.getBySlugPublic,
+    tenantSlug ? { slug: tenantSlug } : "skip"
+  );
+  const ssoEnabled = useQuery(
+    api.sso.oidc.isEnabled,
+    getTenantBySlug?._id ? { tenantId: getTenantBySlug._id } : "skip"
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +65,30 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
       setError(err.message || 'Failed to login. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSSOLogin = async () => {
+    if (!getTenantBySlug?._id) {
+      setError('Organization not found. Please check your organization slug.');
+      return;
+    }
+
+    setIsSSOLoading(true);
+    setError('');
+
+    try {
+      // Initiate SSO login
+      const result = await initiateSSO({
+        tenantId: getTenantBySlug._id as any,
+        redirectUrl: `${window.location.origin}/auth/sso/callback`,
+      });
+
+      // Redirect to SSO provider
+      window.location.href = result.authUrl;
+    } catch (err: any) {
+      setError(err.message || 'SSO login failed. Please try again.');
+      setIsSSOLoading(false);
     }
   };
 
@@ -149,6 +193,30 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignup }
             <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-1">Welcome back</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-500">Enter your credentials to continue.</p>
           </div>
+
+          {/* SSO Login Button (if tenant slug and SSO enabled) */}
+          {tenantSlug && ssoEnabled && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={handleSSOLogin}
+                disabled={isSSOLoading || !getTenantBySlug}
+                className="w-full h-8 flex items-center justify-center gap-2 rounded-md text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSSOLoading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Shield size={14} />
+                    Sign in with SSO
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* OAuth Buttons */}
           <div className="flex gap-3 mb-4">

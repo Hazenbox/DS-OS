@@ -131,20 +131,72 @@ export default defineSchema({
   ssoConfigs: defineTable({
     tenantId: v.id("tenants"),
     provider: v.union(v.literal("saml"), v.literal("oidc")),
-    providerName: v.string(),
+    providerName: v.string(), // e.g., "Okta", "Azure AD", "Google Workspace"
+    // OIDC fields
     clientId: v.optional(v.string()),
-    issuer: v.optional(v.string()),
-    ssoUrl: v.optional(v.string()),
-    certificate: v.optional(v.string()), // If SAML
+    clientSecretEncrypted: v.optional(v.string()), // Encrypted client secret
+    issuer: v.optional(v.string()), // OIDC issuer URL
+    authorizationEndpoint: v.optional(v.string()),
+    tokenEndpoint: v.optional(v.string()),
+    userInfoEndpoint: v.optional(v.string()),
+    jwksUri: v.optional(v.string()), // For token verification
+    scopes: v.optional(v.array(v.string())), // Default: ["openid", "email", "profile"]
+    redirectUri: v.optional(v.string()),
+    // SAML fields
+    ssoUrl: v.optional(v.string()), // SAML SSO URL
+    certificate: v.optional(v.string()), // SAML certificate
+    entityId: v.optional(v.string()), // SAML entity ID
+    // SCIM fields
     scimEnabled: v.optional(v.boolean()),
     scimUrl: v.optional(v.string()),
     scimAuthTokenEncrypted: v.optional(v.string()),
-    allowProvisioning: v.optional(v.boolean()),
+    // Configuration
+    allowProvisioning: v.optional(v.boolean()), // JIT provisioning
+    defaultRole: v.optional(v.union(
+      v.literal("owner"),
+      v.literal("admin"),
+      v.literal("developer"),
+      v.literal("designer"),
+      v.literal("viewer")
+    )), // Default role for JIT-provisioned users
     enabled: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_enabled", ["tenantId", "enabled"]),
+
+  // SSO State - Temporary storage for OAuth state/nonce during SSO flow
+  ssoStates: defineTable({
+    state: v.string(), // CSRF protection
+    nonce: v.string(), // Replay protection
+    tenantId: v.id("tenants"),
+    redirectUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(), // 10 minutes
+  })
+    .index("by_state", ["state"])
     .index("by_tenant", ["tenantId"]),
+
+  // SCIM Events - Audit log for SCIM operations
+  scimEvents: defineTable({
+    tenantId: v.id("tenants"),
+    operation: v.union(
+      v.literal("create"),
+      v.literal("update"),
+      v.literal("delete"),
+      v.literal("get"),
+      v.literal("list")
+    ),
+    resourceType: v.union(v.literal("User"), v.literal("Group")),
+    resourceId: v.optional(v.string()),
+    externalId: v.optional(v.string()),
+    success: v.boolean(),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   // ============================================================================
   // EXISTING TABLES - NOW WITH TENANT ID
@@ -166,6 +218,23 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_tenant_project", ["tenantId", "projectId"])
     .index("by_project_active", ["projectId", "isActive"]),
+
+  // Font Files - Font files uploaded by users (woff, woff2, ttf, otf)
+  fontFiles: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    name: v.string(), // Display name (editable)
+    originalName: v.string(), // Original filename
+    fontFamily: v.string(), // Font family name (e.g., "Inter", "Whyte")
+    fontUrl: v.string(), // URL to font file (stored externally or as base64)
+    format: v.union(v.literal("woff"), v.literal("woff2"), v.literal("ttf"), v.literal("otf")),
+    uploadedAt: v.number(),
+    uploadedBy: v.string(), // User email
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_tenant_project", ["tenantId", "projectId"])
+    .index("by_font_family", ["fontFamily"]),
 
   // Design Tokens - scoped to project
   tokens: defineTable({
@@ -227,7 +296,10 @@ export default defineSchema({
       v.literal("delete"),
       v.literal("import"),
       v.literal("download"),
-      v.literal("release")
+      v.literal("release"),
+      v.literal("component_approved"),
+      v.literal("component_rejected"),
+      v.literal("release_approved")
     ),
     target: v.string(),
     targetType: v.union(
@@ -269,6 +341,41 @@ export default defineSchema({
     changelog: v.string(),
     publishedAt: v.optional(v.number()),
     components: v.array(v.string()),
+    visualDiffResults: v.optional(v.array(v.object({
+      componentId: v.string(),
+      variantId: v.optional(v.string()),
+      passed: v.boolean(),
+      diffPercentage: v.number(),
+      diffImage: v.optional(v.string()),
+      threshold: v.number(),
+      screenshotUrl: v.optional(v.string()),
+      figmaImageUrl: v.optional(v.string()),
+      errors: v.optional(v.array(v.string())),
+      testedAt: v.number(),
+    }))),
+    accessibilityResults: v.optional(v.array(v.object({
+      componentId: v.string(),
+      variantId: v.optional(v.string()),
+      passed: v.boolean(),
+      violations: v.array(v.object({
+        id: v.string(),
+        impact: v.string(),
+        description: v.string(),
+        help: v.string(),
+        helpUrl: v.string(),
+        nodes: v.array(v.string()),
+      })),
+      testedAt: v.number(),
+    }))),
+    componentApprovals: v.optional(v.array(v.object({
+      componentId: v.string(),
+      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+      approvedBy: v.optional(v.string()), // User email
+      approvedAt: v.optional(v.number()),
+      rejectedBy: v.optional(v.string()), // User email
+      rejectedAt: v.optional(v.number()),
+      rejectionReason: v.optional(v.string()),
+    }))),
   })
     .index("by_tenant", ["tenantId"])
     .index("by_project", ["projectId"])
@@ -334,7 +441,9 @@ export default defineSchema({
     provider: v.optional(v.union(
       v.literal("email"),
       v.literal("google"),
-      v.literal("github")
+      v.literal("github"),
+      v.literal("oidc"),
+      v.literal("saml")
     )),
     providerId: v.optional(v.string()),
     createdAt: v.number(),

@@ -895,8 +895,8 @@ export const ComponentBuilder: React.FC = () => {
     <div className="flex h-full overflow-hidden relative">
       {/* Left Panel: Component List */}
       <div className="w-72 border-r border-zinc-200/60 dark:border-zinc-800/60 flex flex-col bg-white dark:bg-zinc-900">
-        <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Builder</h2>
+        <div className="h-16 px-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center">
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">Builder</h2>
         </div>
         
         {/* API Key Status - only show if checked and missing */}
