@@ -113,28 +113,30 @@ export const create = mutation({
     version: v.string(),
     code: v.string(),
     docs: v.string(),
+    storybook: v.optional(v.string()),
+    progressId: v.optional(v.id("extractionProgress")),
   },
   handler: async (ctx, args) => {
-    const { tenantId, userId, ...componentData } = args;
+    const { tenantId, userId, projectId, name, status, version, code, docs, storybook, progressId } = args;
     
     // Verify tenant access and require developer role
     await getTenantContext(ctx, userId, tenantId);
     await requireRole(ctx, tenantId, userId, "developer");
     
     // Verify project access
-    await verifyProjectAccess(ctx, args.projectId, tenantId, userId);
+    await verifyProjectAccess(ctx, projectId, tenantId, userId);
     
     // Input validation
-    const name = componentData.name.trim();
-    if (!name) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       throw new Error("Component name is required");
     }
-    if (name.length > 100) {
+    if (trimmedName.length > 100) {
       throw new Error("Component name must be less than 100 characters");
     }
     
     // Validate version format (semver-like)
-    if (!/^\d+\.\d+\.\d+/.test(componentData.version)) {
+    if (!/^\d+\.\d+\.\d+/.test(version)) {
       throw new Error("Version must be in semver format (e.g., 1.0.0)");
     }
     
@@ -144,8 +146,14 @@ export const create = mutation({
     
     const componentId = await ctx.db.insert("components", {
       tenantId,
-      ...componentData,
-      name,
+      projectId,
+      name: trimmedName,
+      status,
+      version,
+      code,
+      docs,
+      storybook,
+      progressId,
     });
     
     // Log activity
@@ -178,6 +186,8 @@ export const update = mutation({
     version: v.optional(v.string()),
     code: v.optional(v.string()),
     docs: v.optional(v.string()),
+    storybook: v.optional(v.string()),
+    progressId: v.optional(v.id("extractionProgress")),
   },
   handler: async (ctx, args) => {
     const { id, tenantId, userId, ...updates } = args;

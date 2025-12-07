@@ -1,7 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { getTenantContext, verifyTenantResource, requireRole } from "./tenantMiddleware";
+import { api, internal } from "./_generated/api";
+import { parseTokensFromJSON } from "./tokenParser";
 
 // List all token files for a project
 export const list = query({
@@ -31,7 +33,7 @@ export const list = query({
   },
 });
 
-// Create a new token file
+// Create a new token file and parse tokens server-side
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
@@ -39,8 +41,7 @@ export const create = mutation({
     userId: v.id("users"),
     name: v.string(),
     originalName: v.string(),
-    content: v.string(),
-    tokenCount: v.number(),
+    content: v.string(), // Raw JSON content
   },
   handler: async (ctx, args) => {
     // Verify tenant access and require developer role
@@ -54,22 +55,104 @@ export const create = mutation({
     }
     verifyTenantResource(ctx, args.tenantId, project);
     
+    // Parse JSON content server-side
+    let parsedTokens;
+    let tokenCount = 0;
+    
+    try {
+      const json = JSON.parse(args.content);
+      parsedTokens = parseTokensFromJSON(json);
+      tokenCount = parsedTokens.length;
+      
+      console.log(`[TOKEN FILES] Parsed ${tokenCount} tokens from ${args.originalName}`);
+    } catch (error) {
+      console.error(`[TOKEN FILES] Failed to parse JSON:`, error);
+      throw new Error(`Invalid JSON format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
     // Get user email
     const user = await ctx.db.get(args.userId);
     const userEmail = user?.email || "unknown";
     
+    // Create the file record
     const fileId = await ctx.db.insert("tokenFiles", {
       tenantId: args.tenantId,
       projectId: args.projectId,
       name: args.name,
       originalName: args.originalName,
       content: args.content,
-      tokenCount: args.tokenCount,
+      tokenCount: tokenCount,
       isActive: true, // New files are active by default
       uploadedAt: Date.now(),
       uploadedBy: userEmail,
     });
+    
+    // Import tokens automatically (server-side)
+    if (parsedTokens.length > 0) {
+      // Import tokens immediately via internal mutation
+      await ctx.runMutation(internal.tokenFiles._importTokensFromFile, {
+        fileId,
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+        userId: args.userId,
+        tokens: parsedTokens.map(t => ({
+          name: t.name,
+          value: t.value,
+          valueByMode: t.valueByMode,
+          type: t.type,
+          description: t.description,
+          modes: t.modes,
+        })),
+      });
+    }
+    
     return fileId;
+  },
+});
+
+// Internal mutation to import tokens from a file
+export const _importTokensFromFile = internalMutation({
+  args: {
+    fileId: v.id("tokenFiles"),
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    tokens: v.array(v.object({
+      name: v.string(),
+      value: v.string(),
+      valueByMode: v.optional(v.any()), // Record<string, string>
+      type: v.union(
+        v.literal("color"),
+        v.literal("typography"),
+        v.literal("spacing"),
+        v.literal("sizing"),
+        v.literal("radius"),
+        v.literal("shadow"),
+        v.literal("blur"),
+        v.literal("unknown")
+      ),
+      description: v.optional(v.string()),
+      modes: v.optional(v.array(v.string())),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Verify file exists
+    const file = await ctx.db.get(args.fileId);
+    if (!file) {
+      throw new Error("File not found");
+    }
+    
+    // Use bulkImport mutation via runMutation
+    await ctx.runMutation(api.tokens.bulkImport, {
+      projectId: args.projectId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+      tokens: args.tokens,
+      sourceFileId: args.fileId,
+      clearExisting: false, // Don't clear existing tokens
+    });
+    
+    console.log(`[TOKEN FILES] Imported ${args.tokens.length} tokens from file ${args.fileId}`);
   },
 });
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { DeploymentStatus, convexComponentToLegacy } from '../types';
-import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package, Eye } from 'lucide-react';
+import { CheckCircle, Circle, AlertCircle, Loader2, Play, Package, Eye, TestTube } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { useTenant } from '../contexts/TenantContext';
 import { CardSkeleton, TableSkeleton } from './LoadingSpinner';
@@ -46,6 +46,10 @@ export const ReleaseManager: React.FC = () => {
     const createRelease = useMutation(api.releases.create);
     const updateReleaseStatus = useMutation(api.releases.updateStatus);
     const logActivity = useMutation(api.activity.create);
+    const runReleaseTests = useAction(api.releaseTesting.runReleaseTests);
+    
+    const [testingReleaseId, setTestingReleaseId] = useState<Id<"releases"> | null>(null);
+    const [isRunningTests, setIsRunningTests] = useState(false);
 
     const components = (convexComponents || []).map(convexComponentToLegacy);
     const pendingComponents = components.filter(c => c.status !== 'stable' && c.status !== 'deprecated');
@@ -241,6 +245,39 @@ export const ReleaseManager: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {(release.status === 'draft' || release.status === 'in_progress') && (
+                                                <>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!effectiveTenantId || !effectiveUserId) return;
+                                                            setIsRunningTests(true);
+                                                            setTestingReleaseId(release._id);
+                                                            try {
+                                                                await runReleaseTests({
+                                                                    releaseId: release._id,
+                                                                    tenantId: effectiveTenantId,
+                                                                    userId: effectiveUserId,
+                                                                    testTypes: ['visual', 'accessibility'],
+                                                                });
+                                                            } catch (error) {
+                                                                console.error('Failed to run tests:', error);
+                                                            } finally {
+                                                                setIsRunningTests(false);
+                                                                setTestingReleaseId(null);
+                                                            }
+                                                        }}
+                                                        disabled={isRunningTests && testingReleaseId === release._id}
+                                                        className="h-7 px-3 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                                    >
+                                                        {isRunningTests && testingReleaseId === release._id ? (
+                                                            <Loader2 size={12} className="animate-spin" />
+                                                        ) : (
+                                                            <TestTube size={12} />
+                                                        )}
+                                                        Run Tests
+                                                    </button>
+                                                </>
+                                            )}
                                             {release.status === 'in_progress' && (
                                                 <button
                                                     onClick={() => setShowApprovalWorkflow(release._id)}

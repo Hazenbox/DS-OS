@@ -184,6 +184,71 @@ export const create = mutation({
   },
 });
 
+// Update test results for a release
+export const updateTestResults = mutation({
+  args: {
+    releaseId: v.id("releases"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    visualDiffResults: v.optional(v.array(v.object({
+      componentId: v.string(),
+      variantId: v.optional(v.string()),
+      passed: v.boolean(),
+      diffPercentage: v.number(),
+      diffImage: v.optional(v.string()),
+      threshold: v.number(),
+      screenshotUrl: v.optional(v.string()),
+      figmaImageUrl: v.optional(v.string()),
+      errors: v.optional(v.array(v.string())),
+      testedAt: v.number(),
+    }))),
+    accessibilityResults: v.optional(v.array(v.object({
+      componentId: v.string(),
+      variantId: v.optional(v.string()),
+      passed: v.boolean(),
+      violations: v.array(v.object({
+        id: v.string(),
+        impact: v.string(),
+        description: v.string(),
+        help: v.string(),
+        helpUrl: v.string(),
+        nodes: v.array(v.string()),
+      })),
+      testedAt: v.number(),
+      score: v.optional(v.number()),
+    }))),
+  },
+  handler: async (ctx, args) => {
+    const { releaseId, tenantId, userId, ...updates } = args;
+    
+    // Verify tenant access
+    await getTenantContext(ctx, userId, tenantId);
+    
+    const release = await ctx.db.get(releaseId);
+    if (!release) {
+      throw new Error("Release not found");
+    }
+    
+    // Verify release belongs to tenant
+    verifyTenantResource(ctx, tenantId, release);
+    
+    // Update test results
+    const updateData: any = {};
+    
+    if (updates.visualDiffResults !== undefined) {
+      updateData.visualDiffResults = updates.visualDiffResults;
+    }
+    
+    if (updates.accessibilityResults !== undefined) {
+      updateData.accessibilityResults = updates.accessibilityResults;
+    }
+    
+    await ctx.db.patch(releaseId, updateData);
+    
+    return releaseId;
+  },
+});
+
 // Update release status
 // Approve a component in a release
 export const approveComponent = mutation({

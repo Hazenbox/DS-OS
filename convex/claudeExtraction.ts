@@ -58,6 +58,7 @@ interface ExtractedComponent {
   description: string;
   code: string;
   css: string;
+  storybook?: string; // Storybook story code
   variants: Array<{
     name: string;
     properties: Record<string, string>;
@@ -448,207 +449,232 @@ export const extractAndBuildComponent = action({
     tenantId: v.id("tenants"),
     userId: v.id("users"),
     figmaUrl: v.string(),
+    progressId: v.optional(v.id("extractionProgress")),
   },
   handler: async (ctx, args): Promise<ExtractedComponent> => {
-    // Verify tenant access
-    await ctx.runQuery(api.tenants.get, {
-      tenantId: args.tenantId,
-      userId: args.userId,
-    });
-    
-    // Verify project belongs to tenant
-    const project = await ctx.runQuery(api.projects.get, {
-      id: args.projectId,
-      tenantId: args.tenantId,
-      userId: args.userId,
-    });
-    
-    if (!project) {
-      throw new Error('Project not found or access denied');
-    }
-    
-    // Parse Figma URL
-    const urlMatch = args.figmaUrl.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
-    if (!urlMatch) {
-      throw new Error('Invalid Figma URL');
-    }
-    const fileKey = urlMatch[2];
-    
-    // Extract node ID from URL
-    const nodeIdMatch = args.figmaUrl.match(/node-id=([^&]+)/);
-    const nodeId = nodeIdMatch ? decodeURIComponent(nodeIdMatch[1]).replace('-', ':') : null;
-    
-    if (!nodeId) {
-      throw new Error('No node ID found in URL. Please select a specific component.');
-    }
-    
-    // Get API keys from settings (now tenant-scoped)
-    // Figma PAT is stored with key 'figma_pat' (set via api.figma.setFigmaPat)
-    const figmaPat = await ctx.runQuery(api.settings.get, { 
-      tenantId: args.tenantId,
-      userId: args.userId, 
-      key: 'figma_pat' 
-    });
-    
-    const claudeApiKey = await ctx.runQuery(api.settings.get, { 
-      tenantId: args.tenantId,
-      userId: args.userId, 
-      key: 'claudeApiKey' 
-    });
-    
-    if (!figmaPat) {
-      throw new Error('Figma Personal Access Token not configured. Please add it in Settings.');
-    }
-    
-    if (!claudeApiKey) {
-      throw new Error('Claude API Key not configured. Please add it in Settings.');
-    }
-    
-    // Fetch data from Figma
-    console.log(`Fetching Figma node: ${fileKey}/${nodeId}`);
-    
-    const [nodeResponse, variablesResponse] = await Promise.all([
-      fetchFigmaNode(fileKey, nodeId, figmaPat),
-      fetchFigmaVariables(fileKey, figmaPat),
-    ]);
-    
-    const nodeData = nodeResponse.nodes?.[nodeId]?.document;
-    if (!nodeData) {
-      throw new Error('Could not find the specified node in Figma');
-    }
-    
-    const variables = variablesResponse.meta?.variables || {};
-    const variableCollections = variablesResponse.meta?.variableCollections || {};
-    
-    // Extract IRS (Structure IR)
-    const irs = extractIRS(nodeData, args.figmaUrl, fileKey);
-    console.log(`Extracted IRS: ${irs.tree.length} nodes, ${irs.variants.length} variants, ${irs.slots.length} slots`);
-    
-    // Extract IRT (Token IR)
-    const allNodes = [nodeData, ...(nodeData.children || [])];
-    const irt = extractIRT(variables, variableCollections, allNodes);
-    console.log(`Extracted IRT: ${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
-    
-    // Classify component and extract IML (Interaction Model IR)
-    const componentIntelligence = classifyComponent(irs);
-    const iml = extractIML(irs, componentIntelligence);
-    console.log(`Classified as: ${componentIntelligence.category} (confidence: ${componentIntelligence.confidence}), IML: ${iml.states.length} states, ${iml.keyboard.length} keyboard mappings`);
-    
-    // Get project tokens for matching
-    const projectTokens = await ctx.runQuery(api.tokens.list, {
-      projectId: args.projectId,
-      tenantId: args.tenantId,
-      userId: args.userId,
-    });
-    
-    // Convert Figma variables to array format for matching
-    const figmaVarsArray = Object.entries(variables).map(([id, varData]: [string, any]) => ({
-      id,
-      name: varData.name || '',
-      value: formatVariableValue(Object.values(varData.valuesByMode || {})[0], varData.resolvedType || ''),
-      type: varData.resolvedType || '',
-    }));
-    
-    // Match Figma variables to project tokens
-    const tokenMatches = matchFigmaVarsToTokens(
-      figmaVarsArray,
-      (projectTokens || []).map(t => ({
-        name: t.name,
-        value: t.value,
-        type: t.type,
-      }))
-    );
-    
-    console.log(`Matched ${tokenMatches.filter(t => t.matchedToken).length}/${tokenMatches.length} Figma variables to project tokens`);
-    
-    // Legacy extraction (for backward compatibility)
-    const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
-    const extractedProps = extractNodeProperties(nodeData);
-    const variants = extractVariants(nodeData);
-    const usedVariables = findBoundVariables(nodeData, variables).map(v => ({
-      ...v,
-      cssVar: tokenMatches.find(tm => tm.figmaVarName === v.name)?.matchedToken?.cssVar,
-    }));
-    
-    console.log(`Extracted: ${componentName}, ${variants.length} variants, ${usedVariables.length} variables`);
-    
-    // Generate code using deterministic generator (primary method)
-    let generatedCode;
-    try {
-      generatedCode = generateComponentCode(componentName, irs, irt, iml);
-      console.log(`Generated code using deterministic templates`);
-    } catch (error) {
-      console.warn(`Deterministic generation failed, falling back to Claude:`, error);
-      generatedCode = null;
-    }
-    
-    // Fallback to Claude if deterministic generation fails or for enhancement
-    let code: string;
-    let css: string;
-    
-    if (generatedCode) {
-      // Use deterministic generator output
-      code = generatedCode.component;
-      css = generatedCode.styles;
-      
-      // Optionally enhance with Claude for polish
-      try {
-        const claudeEnhancement = await generateComponentWithClaude(
-          componentName,
-          nodeData,
-          extractedProps,
-          variants,
-          usedVariables,
-          claudeApiKey,
-          irs,
-          irt,
-          iml
-        );
-        // Merge or use Claude's output if it's better
-        // For now, we'll use deterministic output as primary
-      } catch (error) {
-        console.warn(`Claude enhancement failed, using deterministic output:`, error);
+    // Helper to update progress
+    const updateProgress = async (stepId: string, status: "in_progress" | "completed" | "failed", details?: string) => {
+      if (args.progressId) {
+        await ctx.runMutation(internal.extractionProgress.updateStep, {
+          progressId: args.progressId,
+          stepId,
+          status,
+          details,
+        });
       }
-    } else {
-      // Fallback to Claude-only generation
-      const claudeResult = await generateComponentWithClaude(
-        componentName,
-        nodeData,
-        extractedProps,
-        variants,
+    };
+    
+    try {
+      // Step 1: Validate
+      await updateProgress("validate", "in_progress");
+      await ctx.runQuery(api.tenants.get, {
+        tenantId: args.tenantId,
+        userId: args.userId,
+      });
+      
+      const project = await ctx.runQuery(api.projects.get, {
+        id: args.projectId,
+        tenantId: args.tenantId,
+        userId: args.userId,
+      });
+      
+      if (!project) {
+        await updateProgress("validate", "failed", "Project not found");
+        throw new Error('Project not found or access denied');
+      }
+      
+      const urlMatch = args.figmaUrl.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
+      if (!urlMatch) {
+        await updateProgress("validate", "failed", "Invalid Figma URL");
+        throw new Error('Invalid Figma URL');
+      }
+      const fileKey = urlMatch[2];
+      
+      const nodeIdMatch = args.figmaUrl.match(/node-id=([^&]+)/);
+      const nodeId = nodeIdMatch ? decodeURIComponent(nodeIdMatch[1]).replace('-', ':') : null;
+      
+      if (!nodeId) {
+        await updateProgress("validate", "failed", "No node ID found");
+        throw new Error('No node ID found in URL. Please select a specific component.');
+      }
+      
+      const figmaPat = await ctx.runQuery(api.settings.get, { 
+        tenantId: args.tenantId,
+        userId: args.userId, 
+        key: 'figma_pat' 
+      });
+      
+      const claudeApiKey = await ctx.runQuery(api.settings.get, { 
+        tenantId: args.tenantId,
+        userId: args.userId, 
+        key: 'claudeApiKey' 
+      });
+      
+      if (!figmaPat) {
+        await updateProgress("validate", "failed", "Figma PAT not configured");
+        throw new Error('Figma Personal Access Token not configured. Please add it in Settings.');
+      }
+      
+      if (!claudeApiKey) {
+        await updateProgress("validate", "failed", "Claude API Key not configured");
+        throw new Error('Claude API Key not configured. Please add it in Settings.');
+      }
+      await updateProgress("validate", "completed");
+      
+      // Step 2: Fetch from Figma
+      await updateProgress("fetch", "in_progress");
+      console.log(`Fetching Figma node: ${fileKey}/${nodeId}`);
+      
+      const [nodeResponse, variablesResponse] = await Promise.all([
+        fetchFigmaNode(fileKey, nodeId, figmaPat),
+        fetchFigmaVariables(fileKey, figmaPat),
+      ]);
+      
+      const nodeData = nodeResponse.nodes?.[nodeId]?.document;
+      if (!nodeData) {
+        await updateProgress("fetch", "failed", "Node not found in Figma");
+        throw new Error('Could not find the specified node in Figma');
+      }
+      await updateProgress("fetch", "completed", `Found component: ${nodeData.name}`);
+      
+      const variables = variablesResponse.meta?.variables || {};
+      const variableCollections = variablesResponse.meta?.variableCollections || {};
+      
+      // Step 3: Extract structure
+      await updateProgress("extract_structure", "in_progress");
+      const irs = extractIRS(nodeData, args.figmaUrl, fileKey);
+      await updateProgress("extract_structure", "completed", `${irs.tree.length} nodes, ${irs.variants.length} variants`);
+      
+      // Step 4: Extract typography
+      await updateProgress("extract_typography", "in_progress");
+      const typographyNodes = irs.tree.filter(n => n.type === 'TEXT' || n.typography);
+      await updateProgress("extract_typography", "completed", `${typographyNodes.length} text nodes`);
+      
+      // Step 5: Extract colors
+      await updateProgress("extract_colors", "in_progress");
+      const colorNodes = irs.tree.filter(n => n.fills && n.fills.length > 0);
+      await updateProgress("extract_colors", "completed", `${colorNodes.length} nodes with fills`);
+      
+      // Step 6: Extract layout
+      await updateProgress("extract_layout", "in_progress");
+      const layoutNodes = irs.tree.filter(n => n.layout);
+      await updateProgress("extract_layout", "completed", `${layoutNodes.length} nodes with layout`);
+      
+      // Step 7: Extract effects
+      await updateProgress("extract_effects", "in_progress");
+      const effectNodes = irs.tree.filter(n => n.effects && n.effects.length > 0);
+      await updateProgress("extract_effects", "completed", `${effectNodes.length} nodes with effects`);
+      
+      // Step 8: Extract variants
+      await updateProgress("extract_variants", "in_progress");
+      await updateProgress("extract_variants", "completed", `${irs.variants.length} variants`);
+      
+      // Step 9: Extract tokens
+      await updateProgress("extract_tokens", "in_progress");
+      const allNodes = [nodeData, ...(nodeData.children || [])];
+      const irt = extractIRT(variables, variableCollections, allNodes);
+      await updateProgress("extract_tokens", "completed", `${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
+      
+      // Step 10: Classify
+      await updateProgress("classify", "in_progress");
+      const componentIntelligence = classifyComponent(irs);
+      const iml = extractIML(irs, componentIntelligence);
+      await updateProgress("classify", "completed", `${componentIntelligence.category} (${Math.round(componentIntelligence.confidence * 100)}% confidence)`);
+      
+      // Step 11: Get project tokens
+      const projectTokens = await ctx.runQuery(api.tokens.list, {
+        projectId: args.projectId,
+        tenantId: args.tenantId,
+        userId: args.userId,
+      });
+      
+      const figmaVarsArray = Object.entries(variables).map(([id, varData]: [string, any]) => ({
+        id,
+        name: varData.name || '',
+        value: formatVariableValue(Object.values(varData.valuesByMode || {})[0], varData.resolvedType || ''),
+        type: varData.resolvedType || '',
+      }));
+      
+      const tokenMatches = matchFigmaVarsToTokens(
+        figmaVarsArray,
+        (projectTokens || []).map((t: { name: string; value: string; type: string }) => ({
+          name: t.name,
+          value: t.value,
+          type: t.type,
+        }))
+      );
+      
+      const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
+      const extractedProps = extractNodeProperties(nodeData);
+      const variants = extractVariants(nodeData);
+      const usedVariables = findBoundVariables(nodeData, variables).map(v => ({
+        ...v,
+        cssVar: tokenMatches.find(tm => tm.figmaVarName === v.name)?.matchedToken?.cssVar,
+      }));
+      
+      // Step 13: Generate types
+      await updateProgress("generate_types", "in_progress");
+      await updateProgress("generate_types", "completed");
+      
+      // Step 14: Generate component
+      await updateProgress("generate_component", "in_progress");
+      let generatedCode;
+      try {
+        generatedCode = generateComponentCode(componentName, irs, irt, iml);
+        await updateProgress("generate_component", "completed", `${generatedCode.component.length} chars`);
+      } catch (error) {
+        await updateProgress("generate_component", "failed", error instanceof Error ? error.message : "Generation failed");
+        throw error;
+      }
+      
+      // Step 15: Generate styles
+      await updateProgress("generate_styles", "in_progress");
+      await updateProgress("generate_styles", "completed", `${generatedCode.styles.length} chars`);
+      
+      const code = generatedCode.component;
+      const css = generatedCode.styles;
+      
+      // Step 16: Finalize
+      await updateProgress("finalize", "in_progress");
+      const variantCss = variants.slice(0, 10).map(v => {
+        const variantClass = Object.values(v.properties).join('-').toLowerCase().replace(/\s+/g, '-');
+        return `.${componentName.toLowerCase()}--${variantClass} { /* variant styles */ }`;
+      }).join('\n');
+      
+      await updateProgress("finalize", "completed");
+      
+      // Generate Storybook story
+      const storybook = generatedCode.storybook || '';
+      
+      return {
+        name: componentName,
+        description: `Extracted from Figma: ${nodeData.name}`,
+        code,
+        css: css + '\n\n' + variantCss,
+        storybook, // Include Storybook story
+        variants: variants.slice(0, 20).map(v => ({
+          name: Object.values(v.properties).join(' / '),
+          properties: v.properties,
+          css: '',
+        })),
+        extractedProperties: extractedProps,
         usedVariables,
-        claudeApiKey,
+        tokenMatches,
         irs,
         irt,
-        iml
-      );
-      code = claudeResult.code;
-      css = claudeResult.css;
+        iml,
+      };
+    } catch (error) {
+      if (args.progressId) {
+        await ctx.runMutation(internal.extractionProgress.updateStatus, {
+          progressId: args.progressId,
+          status: "failed",
+          currentStep: "Extraction failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+      throw error;
     }
-    
-    // Build variant CSS
-    const variantCss = variants.slice(0, 10).map(v => {
-      const variantClass = Object.values(v.properties).join('-').toLowerCase().replace(/\s+/g, '-');
-      return `.${componentName.toLowerCase()}--${variantClass} { /* variant styles */ }`;
-    }).join('\n');
-    
-    return {
-      name: componentName,
-      description: `Extracted from Figma: ${nodeData.name}`,
-      code,
-      css: css + '\n\n' + variantCss,
-      variants: variants.slice(0, 20).map(v => ({
-        name: Object.values(v.properties).join(' / '),
-        properties: v.properties,
-        css: '',
-      })),
-      extractedProperties: extractedProps,
-      usedVariables,
-      tokenMatches, // Include token matches
-      irs, // Include Structure IR
-      irt, // Include Token IR
-      iml, // Include Interaction Model IR
-    };
   },
 });
 

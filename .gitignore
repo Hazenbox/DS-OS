@@ -37,3 +37,6 @@ build/
 
 # Scripts output (if any)
 scripts/*.log
+
+*storybook.log
+storybook-static

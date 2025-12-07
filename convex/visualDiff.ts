@@ -63,7 +63,8 @@ export const captureComponentScreenshot = action({
       throw new Error("Component not found");
     }
     
-    // Get screenshot service URL from environment or use default
+    // Get screenshot service URL from environment
+    // In production, this should be set to the deployed Vercel function URL
     const screenshotServiceUrl = process.env.SCREENSHOT_SERVICE_URL || 
       'https://your-app.vercel.app/api/screenshot';
     
@@ -88,10 +89,14 @@ export const captureComponentScreenshot = action({
       
       const result = await response.json();
       
-      // Return screenshot URL (base64 data URL for now, or uploaded URL in production)
-      return result.screenshotUrl || result.base64 
-        ? `data:image/png;base64,${result.base64}` 
-        : `https://placeholder.screenshot/${args.componentId}`;
+      // Return screenshot URL (prefer CDN URL, fallback to base64)
+      if (result.screenshotUrl) {
+        return result.screenshotUrl;
+      } else if (result.base64) {
+        return `data:image/png;base64,${result.base64}`;
+      } else {
+        throw new Error('No screenshot URL or base64 returned from service');
+      }
     } catch (error) {
       console.error('Screenshot capture failed:', error);
       // Fallback to placeholder if service is not available

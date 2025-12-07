@@ -136,7 +136,7 @@ export function generateMDX(
     mdx += `|-------|-------|------|\n`;
     
     for (const token of irt.tokens.slice(0, 20)) {
-      const value = token.modeValues?.['default'] || token.value || 'N/A';
+      const value = token.modes?.['default'] || token.value || 'N/A';
       mdx += `| \`${token.name}\` | \`${value}\` | ${token.type} |\n`;
     }
     
@@ -157,16 +157,12 @@ export function generateMDX(
     mdx += `- **ARIA Labelled By:** \`${iml.aria.ariaLabelledBy}\`\n`;
   }
   
-  if (iml.interactions.length > 0) {
+  if (iml.keyboard.length > 0) {
     mdx += `\n### Keyboard Navigation\n\n`;
     mdx += `| Key | Action |\n`;
     mdx += `|-----|--------|\n`;
-    for (const interaction of iml.interactions) {
-      if (interaction.keyboard) {
-        for (const [key, action] of Object.entries(interaction.keyboard)) {
-          mdx += `| \`${key}\` | ${action} |\n`;
-        }
-      }
+    for (const kb of iml.keyboard) {
+      mdx += `| \`${kb.key}\` | ${kb.action} |\n`;
     }
     mdx += `\n`;
   }
@@ -176,7 +172,7 @@ export function generateMDX(
     mdx += `## States\n\n`;
     mdx += `${componentName} supports the following states:\n\n`;
     for (const state of iml.states) {
-      mdx += `- **${state.name}**: ${state.description || 'Default state'}\n`;
+      mdx += `- **${state.name}**: Default state\n`;
     }
     mdx += `\n`;
   }
@@ -257,36 +253,44 @@ export const getComponentMDX = query({
     // For now, return placeholder
     const irs: IRS = {
       meta: {
-        componentName: component.name,
+        name: component.name,
+        figmaUrl: '',
+        nodeId: (component as any).figmaNodeId || '',
+        type: 'COMPONENT',
         extractedAt: component._creationTime,
-        figmaNodeId: (component as any).figmaNodeId || '',
       },
       tree: [],
       variants: [],
       slots: [],
       layoutIntent: {
-        display: 'flex',
-        direction: 'row',
+        horizontal: 'intrinsic',
+        vertical: 'intrinsic',
       },
       visualHints: {
         requiresPseudo: false,
         requiresMask: false,
         requiresFilterWorkaround: false,
         unsupportedBlendMode: false,
+        strokeMappingStrategy: 'outline',
       },
     };
     
     const irt: IRT = {
       tokens: [],
       modeValues: {},
-      tokenGraph: {},
+      tokenGraph: {
+        nodes: [],
+        edges: [],
+      },
+      tokenUsage: {},
     };
     
     const iml: IML = {
-      componentCategory: 'generic',
+      componentCategory: 'button',
       interactions: [],
       aria: {},
-      states: [{ name: 'default', description: 'Default state' }],
+      keyboard: [],
+      states: [{ name: 'default', trigger: ':default', changes: {} }],
     };
     
     const mdx = generateMDX(

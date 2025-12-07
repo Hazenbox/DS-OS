@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { put } from '@vercel/blob';
 
 /**
  * Vercel Serverless Function for Screenshot Capture
@@ -120,20 +121,38 @@ export default async function handler(
 
     await browser.close();
 
-    // Convert to base64 for now (in production, upload to S3/Cloudinary)
-    const base64 = screenshot.toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-    // TODO: Upload to storage (S3, Cloudinary, etc.)
-    // const screenshotUrl = await uploadToStorage(screenshot);
+    // Upload to Vercel Blob Storage (if available)
+    let screenshotUrl: string;
+    let base64: string | undefined;
     
-    // For now, return data URL (limited by Vercel response size)
-    // In production, upload to storage and return URL
+    // Check if BLOB_READ_WRITE_TOKEN is available
+    const hasBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    
+    if (hasBlobToken) {
+      try {
+        const blob = await put(`screenshots/${Date.now()}-${Math.random().toString(36).substring(7)}.png`, screenshot, {
+          access: 'public',
+          contentType: 'image/png',
+          addRandomSuffix: false,
+          cacheControlMaxAge: 86400, // 1 day cache
+        });
+        screenshotUrl = blob.url;
+        console.log(`[SCREENSHOT] Uploaded to CDN: ${screenshotUrl}`);
+      } catch (error) {
+        console.warn('[SCREENSHOT] Failed to upload to Blob, using base64 fallback:', error);
+        base64 = screenshot.toString('base64');
+        screenshotUrl = `data:image/png;base64,${base64}`;
+      }
+    } else {
+      // Fallback to base64 if Blob storage not configured
+      base64 = screenshot.toString('base64');
+      screenshotUrl = `data:image/png;base64,${base64}`;
+      console.log('[SCREENSHOT] Using base64 (Blob storage not configured)');
+    }
+    
     return res.status(200).json({
-      screenshotUrl: dataUrl,
-      base64: base64,
-      // In production:
-      // screenshotUrl: screenshotUrl,
+      screenshotUrl,
+      ...(base64 && { base64 }), // Include base64 for compatibility
     });
   } catch (error) {
     console.error('Screenshot capture error:', error);

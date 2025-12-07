@@ -59,46 +59,57 @@ export const runAccessibilityTest = action({
     
     const level = args.rules?.level || "AA"; // Default to WCAG AA
     
+    // Get component code
+    const component = await ctx.runQuery(api.components.get, {
+      id: args.componentId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
+    if (!component) {
+      throw new Error("Component not found");
+    }
+    
+    // Get accessibility service URL from environment
+    const accessibilityServiceUrl = process.env.ACCESSIBILITY_SERVICE_URL || 
+      'https://your-app.vercel.app/api/accessibility';
+    
     try {
-      // TODO: Implement actual axe-core testing
-      // Note: axe-core requires Playwright/browser environment
-      // For Convex actions, we need to:
-      // 1. Set up a separate service for accessibility testing
-      // 2. Or use a service like Pa11y, Lighthouse CI
+      // Call Vercel serverless function for accessibility testing
+      const response = await fetch(accessibilityServiceUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          componentCode: component.code,
+          level: level,
+          tags: args.rules?.tags,
+        }),
+      });
       
-      // Example implementation (requires external service):
-      // const response = await fetch('https://a11y-service.vercel.app/api/test', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ 
-      //     componentCode,
-      //     level: args.rules?.level || 'AA',
-      //     tags: args.rules?.tags,
-      //   }),
-      // });
-      // const result = await response.json();
-      // return result;
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Accessibility service error: ${error}`);
+      }
       
-      // For now, return mock result
-      // In production, use:
-      // import { injectAxe, checkA11y } from '@axe-core/playwright';
-      // await injectAxe(page);
-      // const results = await checkA11y(page, null, {
-      //   detailedReport: true,
-      //   detailedReportOptions: { html: true }
-      // });
+      const result = await response.json();
       
-      const mockViolations: AccessibilityViolation[] = [];
-      
-      // Mock: Check if component has proper ARIA attributes
-      // This would be verified against IML data in production
-      
+      // Map service response to our format
       return {
         componentId: args.componentId,
         variantId: args.variantId,
-        passed: mockViolations.length === 0,
-        violations: mockViolations,
+        passed: result.passed || false,
+        violations: (result.violations || []).map((v: any) => ({
+          id: v.id,
+          impact: v.impact,
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          nodes: v.nodes || [],
+        })),
         testedAt: Date.now(),
-        score: mockViolations.length === 0 ? 100 : Math.max(0, 100 - (mockViolations.length * 10)),
+        score: result.score || (result.passed ? 100 : 0),
       };
     } catch (error) {
       return {

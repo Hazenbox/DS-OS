@@ -620,7 +620,7 @@ export const TokenManager: React.FC = () => {
         }
     };
 
-    // Handle file selection - parse and show preview
+    // Handle file selection - parse client-side for preview only, server will parse for import
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -629,15 +629,17 @@ export const TokenManager: React.FC = () => {
         reader.onload = (event) => {
             try {
                 const content = event.target?.result as string;
+                // Validate JSON format
                 const json = JSON.parse(content);
+                
+                // Parse client-side for preview only (UX)
                 const parsed = parseTokensFromJSON(json);
                 
-                console.log(`[TokenManager] Parsed ${parsed.length} tokens from ${file.name}`);
-                console.log('[TokenManager] Sample tokens:', parsed.slice(0, 5));
+                console.log(`[TokenManager] Preview: ${parsed.length} tokens from ${file.name}`);
                 
                 setPreviewFileName(file.name);
-                setPreviewFileContent(content);
-                setPreviewTokens(parsed);
+                setPreviewFileContent(content); // Store raw JSON for server-side import
+                setPreviewTokens(parsed); // Show preview to user
                 setShowPreview(true);
             } catch (err) {
                 console.error('[TokenManager] Parse error:', err);
@@ -896,30 +898,23 @@ export const TokenManager: React.FC = () => {
     };
 
     // Confirm and import tokens from preview
+    // Server will parse JSON and import tokens automatically
     const handleConfirmImport = async () => {
-        if (!projectId || !effectiveTenantId || !effectiveUserId || previewTokens.length === 0) return;
+        if (!projectId || !effectiveTenantId || !effectiveUserId || !previewFileContent) return;
         
         try {
-            // Create the file record first
-            const fileId = await createFile({
+            // Server will parse JSON and import tokens automatically
+            // No need to send parsed tokens - server handles everything
+            await createFile({
                 projectId,
                 tenantId: effectiveTenantId,
                 userId: effectiveUserId,
                 name: previewFileName.replace('.json', ''),
                 originalName: previewFileName,
-                content: previewFileContent,
-                tokenCount: previewTokens.length,
+                content: previewFileContent, // Raw JSON - server will parse
             });
             
-            // Then import the tokens linked to this file
-            await bulkImport({ 
-                projectId,
-                tenantId: effectiveTenantId,
-                userId: effectiveUserId,
-                tokens: previewTokens,
-                sourceFileId: fileId,
-                clearExisting: false 
-            });
+            console.log('[TokenManager] File uploaded, server is parsing and importing tokens...');
             
             // Close preview
             setShowPreview(false);

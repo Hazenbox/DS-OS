@@ -14,29 +14,36 @@ interface ThemeTokensState {
   tokenCount: number;
   version: string | null;
   cssInjected: boolean;
+  availableModes: string[];
+  currentMode: string;
 }
 
 interface UseThemeTokensResult extends ThemeTokensState {
   compile: () => Promise<void>;
   getTokenValue: (tokenName: string) => string | undefined;
+  setMode: (mode: string) => void;
   tokenMap: Record<string, string>;
 }
 
 const STYLE_ELEMENT_ID = 'ds-os-theme-tokens';
 
 /**
- * Hook to manage global theme tokens
+ * Hook to manage global theme tokens with multi-mode support
  * 
  * Usage:
  * ```tsx
- * const { isLoading, tokenCount, compile, getTokenValue } = useThemeTokens({
+ * const { isLoading, tokenCount, compile, getTokenValue, setMode, currentMode } = useThemeTokens({
  *   projectId,
  *   tenantId,
  *   userId,
+ *   defaultMode: 'light', // Optional: default mode
  * });
  * 
  * // Get a specific token's CSS variable
  * const primaryColor = getTokenValue('color-primary-500'); // "var(--color-primary-500)"
+ * 
+ * // Switch modes
+ * setMode('dark');
  * ```
  */
 export function useThemeTokens({
@@ -44,11 +51,13 @@ export function useThemeTokens({
   tenantId,
   userId,
   autoInject = true,
+  defaultMode = 'default',
 }: {
   projectId: Id<"projects"> | null | undefined;
   tenantId: Id<"tenants"> | null | undefined;
   userId: Id<"users"> | null | undefined;
   autoInject?: boolean;
+  defaultMode?: string;
 }): UseThemeTokensResult {
   const [state, setState] = useState<ThemeTokensState>({
     isLoading: true,
@@ -57,6 +66,8 @@ export function useThemeTokens({
     tokenCount: 0,
     version: null,
     cssInjected: false,
+    availableModes: [],
+    currentMode: defaultMode,
   });
 
   const [tokenMap, setTokenMap] = useState<Record<string, string>>({});
@@ -65,22 +76,52 @@ export function useThemeTokens({
   // Track if component is mounted to avoid state updates after unmount
   const mountedRef = useRef(true);
 
-  // Inject CSS into document head
-  const injectCSS = useCallback((cssContent: string) => {
+  // Apply mode to document element
+  const applyMode = useCallback((mode: string) => {
+    // Set data-theme attribute for mode-specific CSS selectors
+    document.documentElement.setAttribute('data-theme', mode);
+    console.log(`[TOKENS] Applied theme mode: ${mode}`);
+  }, []);
+
+  // Inject CSS from CDN URL or fallback content
+  const injectCSS = useCallback(async (cssUrl?: string, cssContent?: string) => {
     // Remove existing style element if present
     const existing = document.getElementById(STYLE_ELEMENT_ID);
     if (existing) {
       existing.remove();
     }
 
-    // Create and inject new style element
-    const styleElement = document.createElement('style');
-    styleElement.id = STYLE_ELEMENT_ID;
-    styleElement.textContent = cssContent;
-    document.head.appendChild(styleElement);
+    // Prefer CDN URL if available
+    if (cssUrl) {
+      try {
+        // Create link element for CDN (better caching)
+        const linkElement = document.createElement('link');
+        linkElement.id = STYLE_ELEMENT_ID;
+        linkElement.rel = 'stylesheet';
+        linkElement.href = cssUrl;
+        linkElement.crossOrigin = 'anonymous';
+        document.head.appendChild(linkElement);
 
-    console.log('[TOKENS] Injected global theme CSS into document head');
-    return true;
+        console.log('[TOKENS] Injected CSS from CDN:', cssUrl);
+        return true;
+      } catch (error) {
+        console.warn('[TOKENS] Failed to load CSS from CDN, falling back to inline:', error);
+        // Fall through to inline CSS
+      }
+    }
+
+    // Fallback to inline CSS if CDN unavailable or no URL
+    if (cssContent) {
+      const styleElement = document.createElement('style');
+      styleElement.id = STYLE_ELEMENT_ID;
+      styleElement.textContent = cssContent;
+      document.head.appendChild(styleElement);
+
+      console.log('[TOKENS] Injected global theme CSS inline (fallback)');
+      return true;
+    }
+
+    return false;
   }, []);
 
   // Load and inject bundle
@@ -114,14 +155,43 @@ export function useThemeTokens({
         return;
       }
 
-      // Parse JSON map
-      const map = JSON.parse(bundle.jsonContent) as Record<string, string>;
+      // Load JSON map from CDN or fallback
+      let map: Record<string, string> = {};
+      if (bundle.jsonUrl) {
+        try {
+          const response = await fetch(bundle.jsonUrl);
+          if (response.ok) {
+            map = await response.json();
+            console.log('[TOKENS] Loaded JSON map from CDN:', bundle.jsonUrl);
+          } else {
+            throw new Error('Failed to fetch from CDN');
+          }
+        } catch (error) {
+          console.warn('[TOKENS] Failed to load JSON from CDN, using fallback:', error);
+          if (bundle.jsonContent) {
+            map = JSON.parse(bundle.jsonContent) as Record<string, string>;
+          }
+        }
+      } else if (bundle.jsonContent) {
+        map = JSON.parse(bundle.jsonContent) as Record<string, string>;
+      }
       setTokenMap(map);
 
-      // Inject CSS if autoInject is enabled
+      // Extract available modes from bundle (if available)
+      const modes = bundle.modes || ['default'];
+      // Use existing currentMode if valid, otherwise default to first available mode
+      const currentMode = (state.currentMode && modes.includes(state.currentMode)) 
+        ? state.currentMode 
+        : (modes.includes('light') ? 'light' : modes[0]);
+
+      // Inject CSS if autoInject is enabled (prefer CDN URL)
       let injected = false;
-      if (autoInject && bundle.cssContent) {
-        injected = injectCSS(bundle.cssContent);
+      if (autoInject) {
+        injected = await injectCSS(bundle.cssUrl, bundle.cssContent);
+        // Apply current mode after CSS injection
+        if (injected) {
+          applyMode(currentMode);
+        }
       }
 
       setState(prev => ({
@@ -130,9 +200,11 @@ export function useThemeTokens({
         tokenCount: bundle.tokenCount,
         version: bundle.version,
         cssInjected: injected,
+        availableModes: modes,
+        currentMode: currentMode,
       }));
 
-      console.log(`[TOKENS] Loaded theme bundle: ${bundle.tokenCount} tokens, version ${bundle.version}`);
+      console.log(`[TOKENS] Loaded theme bundle: ${bundle.tokenCount} tokens, version ${bundle.version}, modes: ${modes.join(', ')}`);
     } catch (err) {
       if (!mountedRef.current) return;
       console.error('[TOKENS] Failed to load theme bundle:', err);
@@ -142,7 +214,7 @@ export function useThemeTokens({
         error: err instanceof Error ? err.message : 'Failed to load theme',
       }));
     }
-  }, [projectId, tenantId, userId, convex, autoInject, injectCSS]);
+  }, [projectId, tenantId, userId, convex, autoInject, injectCSS, applyMode]);
 
   // Compile and reload bundle
   const compile = useCallback(async () => {
@@ -180,6 +252,18 @@ export function useThemeTokens({
     }
   }, [projectId, tenantId, userId, convex, loadBundle]);
 
+  // Set theme mode
+  const setMode = useCallback((mode: string) => {
+    if (!state.availableModes.includes(mode) && mode !== 'default') {
+      console.warn(`[TOKENS] Mode "${mode}" not available. Available modes: ${state.availableModes.join(', ')}`);
+      return;
+    }
+    
+    setState(prev => ({ ...prev, currentMode: mode }));
+    applyMode(mode);
+    console.log(`[TOKENS] Switched to mode: ${mode}`);
+  }, [state.availableModes, applyMode]);
+
   // Get token value from map
   const getTokenValue = useCallback(
     (tokenName: string): string | undefined => {
@@ -208,6 +292,7 @@ export function useThemeTokens({
     ...state,
     compile,
     getTokenValue,
+    setMode,
     tokenMap,
   };
 }

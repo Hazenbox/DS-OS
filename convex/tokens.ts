@@ -297,6 +297,7 @@ export const bulkImport = mutation({
     tokens: v.array(v.object({
       name: v.string(),
       value: v.string(),
+      valueByMode: v.optional(v.any()), // Record<string, string>
       type: v.union(
         v.literal("color"),
         v.literal("typography"),
@@ -309,6 +310,7 @@ export const bulkImport = mutation({
       ),
       description: v.optional(v.string()),
       brand: v.optional(v.string()),
+      modes: v.optional(v.array(v.string())),
     })),
     sourceFileId: v.optional(v.id("tokenFiles")),
     clearExisting: v.optional(v.boolean()),
@@ -348,8 +350,13 @@ export const bulkImport = mutation({
     for (const token of args.tokens) {
       const id = await ctx.db.insert("tokens", {
         tenantId: args.tenantId,
-        ...token,
         name: token.name.trim(),
+        value: token.value,
+        valueByMode: token.valueByMode,
+        type: token.type,
+        description: token.description,
+        brand: token.brand,
+        modes: token.modes,
         projectId: args.projectId,
         sourceFileId: args.sourceFileId,
       });

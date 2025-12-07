@@ -61,9 +61,23 @@ export function extractIRS(
                    node.type === 'COMPONENT' ? 'component' : 'frame',
   };
 
+  console.log(`[IRS EXTRACTION] Starting extraction for: ${node.name} (type: ${node.type})`);
+  console.log(`[IRS EXTRACTION] Node has ${node.children?.length || 0} children`);
+  
   const tree = extractNodeTree(node);
+  console.log(`[IRS EXTRACTION] Extracted ${tree.length} tree nodes`);
+  console.log(`[IRS EXTRACTION] Tree structure:`, tree.map(n => ({ name: n.name, type: n.type, children: n.children?.length || 0 })));
+  
   const variants = extractVariantMatrix(node);
+  console.log(`[IRS EXTRACTION] Extracted ${variants.length} variants`);
+  
   const slots = extractSlots(node);
+  console.log(`[IRS EXTRACTION] Extracted ${slots.length} slots`);
+  if (slots.length > 10) {
+    console.warn(`[IRS EXTRACTION] WARNING: Too many slots detected (${slots.length}). This might indicate over-detection.`);
+    console.log(`[IRS EXTRACTION] Slot names:`, slots.map(s => s.name).slice(0, 10), '...');
+  }
+  
   const layoutIntent = extractLayoutIntent(node);
   const visualHints = extractCSSHints(node);
   const stateMapping = extractStateMapping(node, variants);
@@ -411,11 +425,28 @@ function extractSlots(node: FigmaNode): SlotDefinition[] {
   const slotNames = ['label', 'icon', 'content', 'action', 'prefix', 'suffix', 'helperText', 'errorText'];
   const seenSlotNames = new Set<string>();
   
-  function findSlots(n: FigmaNode, parentName: string = '') {
-    const name = n.name.toLowerCase();
+  function findSlots(n: FigmaNode, parentName: string = '', depth: number = 0) {
+    // Limit depth to avoid finding too many slots (only check direct children and grandchildren)
+    if (depth > 2) return;
     
+    const name = n.name.toLowerCase().trim();
+    
+    // More strict matching: slot name should be at the start or end of the node name, or be the exact name
+    // This prevents matching nodes like "IconContainer" or "LabelWrapper" unless they're specifically named
     for (const slotName of slotNames) {
-      if (name.includes(slotName)) {
+      const slotNameLower = slotName.toLowerCase();
+      
+      // Match patterns:
+      // - Exact match: "icon", "label"
+      // - Start with slot name: "icon-left", "label-text"
+      // - End with slot name: "left-icon", "text-label"
+      // - Contains with separator: "icon-left", "label-top"
+      const isExactMatch = name === slotNameLower;
+      const startsWithSlot = name.startsWith(slotNameLower + '-') || name.startsWith(slotNameLower + '_') || name.startsWith(slotNameLower + ' ');
+      const endsWithSlot = name.endsWith('-' + slotNameLower) || name.endsWith('_' + slotNameLower) || name.endsWith(' ' + slotNameLower);
+      // Removed hasSlotWithSeparator - too permissive
+      // Only match exact or with clear separators at start/end
+      if (isExactMatch || startsWithSlot || endsWithSlot) {
         // Make slot name unique if we've seen it before
         let uniqueSlotName = slotName;
         let counter = 1;
@@ -445,11 +476,20 @@ function extractSlots(node: FigmaNode): SlotDefinition[] {
     }
     
     if (n.children) {
-      n.children.forEach(child => findSlots(child, name));
+      n.children.forEach(child => findSlots(child, name, depth + 1));
     }
   }
   
   findSlots(node);
+  
+  console.log(`[SLOT EXTRACTION] Found ${slots.length} slots:`, slots.map(s => s.name));
+  
+  // Hard limit: Never return more than 10 slots to avoid prop bloat
+  if (slots.length > 10) {
+    console.warn(`[SLOT EXTRACTION] WARNING: Too many slots detected (${slots.length}). Limiting to first 10.`);
+    console.warn(`[SLOT EXTRACTION] This usually means slot detection is too aggressive. Consider reviewing node names.`);
+    return slots.slice(0, 10);
+  }
   
   return slots;
 }

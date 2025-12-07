@@ -61,124 +61,15 @@ function groupTokensByType(tokens: Array<{ name: string; value: string; type: st
 // INTERNAL QUERIES
 // ============================================================================
 
-export const _getProjectTokens = internalQuery({
-  args: {
-    projectId: v.id("projects"),
-    tenantId: v.id("tenants"),
-  },
-  handler: async (ctx, args) => {
-    console.log(`[TOKENS] Fetching tokens for project ${args.projectId}`);
-    
-    // Get all active token files for this project
-    const activeFiles = await ctx.db
-      .query("tokenFiles")
-      .withIndex("by_tenant_project", (q) =>
-        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
-      )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+// _getProjectTokens moved to tokenBundles.ts (non-Node.js file)
 
-    const activeFileIds = new Set(activeFiles.map((f) => f._id.toString()));
-    console.log(`[TOKENS] Found ${activeFiles.length} active token files`);
-
-    // Get all tokens for this project
-    const tokens = await ctx.db
-      .query("tokens")
-      .withIndex("by_tenant_project", (q) =>
-        q.eq("tenantId", args.tenantId).eq("projectId", args.projectId)
-      )
-      .collect();
-
-    // Filter to only include tokens from active files or manually added
-    const activeTokens = tokens.filter((token) => {
-      if (!token.sourceFileId) return true;
-      return activeFileIds.has(token.sourceFileId.toString());
-    });
-
-    console.log(`[TOKENS] Returning ${activeTokens.length} active tokens (filtered from ${tokens.length} total)`);
-    return activeTokens;
-  },
-});
-
-export const _getExistingBundle = internalQuery({
-  args: {
-    projectId: v.id("projects"),
-    tenantId: v.id("tenants"),
-    type: v.union(v.literal("global"), v.literal("component")),
-    componentId: v.optional(v.id("components")),
-  },
-  handler: async (ctx, args) => {
-    if (args.type === "global") {
-      const bundles = await ctx.db
-        .query("tokenBundles")
-        .withIndex("by_project_type", (q) =>
-          q.eq("projectId", args.projectId).eq("type", "global")
-        )
-        .collect();
-      return bundles[0] || null;
-    } else if (args.componentId) {
-      const bundles = await ctx.db
-        .query("tokenBundles")
-        .withIndex("by_component", (q) => q.eq("componentId", args.componentId))
-        .collect();
-      return bundles[0] || null;
-    }
-    return null;
-  },
-});
+// _getExistingBundle moved to tokenBundles.ts (non-Node.js file)
 
 // ============================================================================
 // INTERNAL MUTATIONS
 // ============================================================================
 
-export const _upsertBundle = internalMutation({
-  args: {
-    tenantId: v.id("tenants"),
-    projectId: v.id("projects"),
-    type: v.union(v.literal("global"), v.literal("component")),
-    componentId: v.optional(v.id("components")),
-    version: v.string(),
-    cssContent: v.optional(v.string()),
-    jsonContent: v.string(),
-    tokenCount: v.number(),
-    modes: v.optional(v.array(v.string())),
-    existingBundleId: v.optional(v.id("tokenBundles")),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    if (args.existingBundleId) {
-      // Update existing bundle
-      await ctx.db.patch(args.existingBundleId, {
-        version: args.version,
-        cssContent: args.cssContent,
-        jsonContent: args.jsonContent,
-        tokenCount: args.tokenCount,
-        modes: args.modes,
-        updatedAt: now,
-      });
-      console.log(`[TOKENS] Updated bundle ${args.existingBundleId}`);
-      return args.existingBundleId;
-    } else {
-      // Create new bundle
-      const bundleId = await ctx.db.insert("tokenBundles", {
-        tenantId: args.tenantId,
-        projectId: args.projectId,
-        type: args.type,
-        componentId: args.componentId,
-        version: args.version,
-        cssContent: args.cssContent,
-        jsonContent: args.jsonContent,
-        tokenCount: args.tokenCount,
-        modes: args.modes,
-        createdAt: now,
-        updatedAt: now,
-      });
-      console.log(`[TOKENS] Created new bundle ${bundleId}`);
-      return bundleId;
-    }
-  },
-});
+// _upsertBundle moved to tokenBundles.ts (non-Node.js file)
 
 // ============================================================================
 // COMPILE GLOBAL THEME ACTION
@@ -205,7 +96,7 @@ export const compileGlobalTheme = action({
     });
 
     // Get all active tokens
-    const tokens = await ctx.runQuery(internal.tokenCompiler._getProjectTokens, {
+    const tokens = await ctx.runQuery(internal.tokenBundles._getProjectTokens, {
       projectId: args.projectId,
       tenantId: args.tenantId,
     });
@@ -256,25 +147,108 @@ export const compileGlobalTheme = action({
     console.log(`[TOKENS] Generated CSS: ${cssContent.length} bytes, JSON: ${jsonContent.length} bytes`);
 
     // Check for existing bundle
-    const existingBundle = await ctx.runQuery(internal.tokenCompiler._getExistingBundle, {
+    const existingBundle = await ctx.runQuery(internal.tokenBundles._getExistingBundle, {
       projectId: args.projectId,
       tenantId: args.tenantId,
       type: "global",
     });
 
-    // Generate version (semver-like based on timestamp)
-    const version = `1.0.${Date.now()}`;
+    // Collect all available modes from tokens
+    const allModes = new Set<string>();
+    for (const token of tokens) {
+      if (token.modes && Array.isArray(token.modes)) {
+        token.modes.forEach((mode: string) => allModes.add(mode));
+      }
+    }
+    const availableModes = Array.from(allModes).length > 0 ? Array.from(allModes) : ["default"];
+    
+    // Generate version (semantic versioning: major.minor.patch)
+    // Major: breaking changes (schema changes) - always 1 for now
+    // Minor: increments when new tokens are added
+    // Patch: timestamp-based for cache busting
+    const existingTokenCount = existingBundle?.tokenCount || 0;
+    const versionMajor = 1;
+    let versionMinor = 0;
+    if (existingBundle) {
+      const parts = existingBundle.version.split('.');
+      versionMinor = parseInt(parts[1] || '0');
+      if (tokens.length > existingTokenCount) {
+        versionMinor += 1; // New tokens added
+      }
+    } else if (tokens.length > 0) {
+      versionMinor = 0; // First version
+    }
+    const versionPatch = Math.floor(Date.now() / 1000) % 100000; // Unix timestamp mod for patch
+    const version = `${versionMajor}.${versionMinor}.${versionPatch}`;
 
-    // Upsert the bundle
-    const bundleId = await ctx.runMutation(internal.tokenCompiler._upsertBundle, {
+    // Generate mode-specific CSS if multiple modes exist
+    let finalCssContent = cssContent;
+    if (availableModes.length > 1) {
+      // Generate CSS for each mode
+      const modeCss: string[] = [];
+      modeCss.push("/* DS-OS Generated Token Bundle - Multi-Mode */");
+      modeCss.push(`/* Generated: ${new Date().toISOString()} */`);
+      modeCss.push(`/* Token Count: ${tokens.length} */`);
+      modeCss.push(`/* Modes: ${availableModes.join(', ')} */`);
+      modeCss.push("");
+      
+      for (const mode of availableModes) {
+        modeCss.push(`[data-theme="${mode}"] {`);
+        const modeTokens = tokens.filter((t: any) => 
+          !t.valueByMode || t.valueByMode[mode] !== undefined
+        );
+        for (const token of modeTokens) {
+          const tokenValue = token.valueByMode?.[mode] || token.value;
+          modeCss.push(tokenToCSSVar(token.name, tokenValue));
+        }
+        modeCss.push("}");
+        modeCss.push("");
+      }
+      
+      // Also include default :root for backward compatibility
+      modeCss.push(":root {");
+      for (const token of tokens) {
+        modeCss.push(tokenToCSSVar(token.name, token.value));
+      }
+      modeCss.push("}");
+      
+      finalCssContent = modeCss.join("\n");
+    }
+
+    // Upload to CDN (Vercel Blob Storage)
+    let cssUrl: string | undefined;
+    let jsonUrl: string | undefined;
+    
+    try {
+      const storageResult = await ctx.runAction(api.storage.uploadBundle, {
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+        version,
+        type: "global",
+        cssContent: finalCssContent,
+        jsonContent,
+        modes: availableModes,
+      });
+      cssUrl = storageResult.cssUrl;
+      jsonUrl = storageResult.jsonUrl;
+      console.log(`[TOKENS] Uploaded bundles to CDN: CSS=${cssUrl}, JSON=${jsonUrl}`);
+    } catch (error) {
+      console.error(`[TOKENS] Failed to upload to CDN, using DB fallback:`, error);
+      // Continue with DB storage as fallback
+    }
+
+    // Upsert the bundle (with CDN URLs if available)
+    const bundleId = await ctx.runMutation(internal.tokenBundles._upsertBundle, {
       tenantId: args.tenantId,
       projectId: args.projectId,
       type: "global",
       version,
-      cssContent,
-      jsonContent,
+      cssContent: finalCssContent, // Keep for fallback
+      jsonContent, // Keep for fallback
+      cssUrl,
+      jsonUrl,
       tokenCount: tokens.length,
-      modes: ["default"], // TODO: Support light/dark modes
+      modes: availableModes,
       existingBundleId: existingBundle?._id,
     });
 
@@ -283,7 +257,7 @@ export const compileGlobalTheme = action({
     return {
       bundleId,
       tokenCount: tokens.length,
-      cssSize: cssContent.length,
+      cssSize: finalCssContent.length,
       jsonSize: jsonContent.length,
     };
   },
@@ -293,22 +267,7 @@ export const compileGlobalTheme = action({
 // GET GLOBAL BUNDLE QUERY
 // ============================================================================
 
-export const getGlobalBundle = internalQuery({
-  args: {
-    projectId: v.id("projects"),
-    tenantId: v.id("tenants"),
-  },
-  handler: async (ctx, args) => {
-    const bundles = await ctx.db
-      .query("tokenBundles")
-      .withIndex("by_project_type", (q) =>
-        q.eq("projectId", args.projectId).eq("type", "global")
-      )
-      .collect();
-
-    return bundles[0] || null;
-  },
-});
+// getGlobalBundle moved to tokenBundles.ts (non-Node.js file)
 
 // ============================================================================
 // COMPILE COMPONENT TOKENS ACTION
@@ -415,7 +374,7 @@ export const compileComponentTokens = action({
     }
 
     // Get all project tokens
-    const tokens = await ctx.runQuery(internal.tokenCompiler._getProjectTokens, {
+    const tokens = await ctx.runQuery(internal.tokenBundles._getProjectTokens, {
       projectId: args.projectId,
       tenantId: args.tenantId,
     });
@@ -449,7 +408,7 @@ export const compileComponentTokens = action({
     const jsonContent = JSON.stringify(jsonMap, null, 2);
 
     // Check for existing bundle
-    const existingBundle = await ctx.runQuery(internal.tokenCompiler._getExistingBundle, {
+    const existingBundle = await ctx.runQuery(internal.tokenBundles._getExistingBundle, {
       projectId: args.projectId,
       tenantId: args.tenantId,
       type: "component",
@@ -458,14 +417,34 @@ export const compileComponentTokens = action({
 
     const version = `1.0.${Date.now()}`;
 
-    // Upsert the bundle
-    const bundleId = await ctx.runMutation(internal.tokenCompiler._upsertBundle, {
+    // Upload to CDN (Vercel Blob Storage)
+    let jsonUrl: string | undefined;
+    
+    try {
+      const storageResult = await ctx.runAction(api.storage.uploadBundle, {
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+        version,
+        type: "component",
+        componentId: args.componentId,
+        jsonContent,
+      });
+      jsonUrl = storageResult.jsonUrl;
+      console.log(`[TOKENS] Uploaded component bundle to CDN: JSON=${jsonUrl}`);
+    } catch (error) {
+      console.error(`[TOKENS] Failed to upload component bundle to CDN, using DB fallback:`, error);
+      // Continue with DB storage as fallback
+    }
+
+    // Upsert the bundle (with CDN URL if available)
+    const bundleId = await ctx.runMutation(internal.tokenBundles._upsertBundle, {
       tenantId: args.tenantId,
       projectId: args.projectId,
       type: "component",
       componentId: args.componentId,
       version,
-      jsonContent,
+      jsonContent, // Keep for fallback
+      jsonUrl,
       tokenCount: matchedTokens.length,
       existingBundleId: existingBundle?._id,
     });
@@ -485,19 +464,7 @@ export const compileComponentTokens = action({
 // GET COMPONENT BUNDLE QUERY
 // ============================================================================
 
-export const getComponentBundle = internalQuery({
-  args: {
-    componentId: v.id("components"),
-  },
-  handler: async (ctx, args) => {
-    const bundles = await ctx.db
-      .query("tokenBundles")
-      .withIndex("by_component", (q) => q.eq("componentId", args.componentId))
-      .collect();
-
-    return bundles[0] || null;
-  },
-});
+// getComponentBundle moved to tokenBundles.ts (non-Node.js file)
 
 // ============================================================================
 // PUBLIC QUERY FOR CLIENT
@@ -509,14 +476,23 @@ export const getProjectBundle = action({
     tenantId: v.id("tenants"),
     userId: v.id("users"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    version: string;
+    cssContent?: string;
+    jsonContent?: string;
+    cssUrl?: string;
+    jsonUrl?: string;
+    tokenCount: number;
+    modes: string[];
+    updatedAt: number;
+  } | null> => {
     // Verify access
     await ctx.runQuery(api.tenants.get, {
       tenantId: args.tenantId,
       userId: args.userId,
     });
 
-    const bundle = await ctx.runQuery(internal.tokenCompiler.getGlobalBundle, {
+    const bundle = await ctx.runQuery(internal.tokenBundles.getGlobalBundle, {
       projectId: args.projectId,
       tenantId: args.tenantId,
     });
@@ -527,9 +503,12 @@ export const getProjectBundle = action({
 
     return {
       version: bundle.version,
-      cssContent: bundle.cssContent,
-      jsonContent: bundle.jsonContent,
+      cssContent: bundle.cssContent, // Fallback if CDN unavailable
+      jsonContent: bundle.jsonContent, // Fallback if CDN unavailable
+      cssUrl: bundle.cssUrl, // CDN URL (preferred)
+      jsonUrl: bundle.jsonUrl, // CDN URL (preferred)
       tokenCount: bundle.tokenCount,
+      modes: bundle.modes || ['default'],
       updatedAt: bundle.updatedAt,
     };
   },

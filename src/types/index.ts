@@ -1,6 +1,6 @@
 import { Id } from "../../convex/_generated/dataModel";
 
-export type ViewState = 'dashboard' | 'tokens' | 'builder' | 'documentation' | 'releases' | 'feedback' | 'settings' | 'projects';
+export type ViewState = 'dashboard' | 'tokens' | 'builder' | 'documentation' | 'releases' | 'feedback' | 'settings' | 'projects' | 'storybook';
 
 export type TokenType = 'color' | 'typography' | 'spacing' | 'sizing' | 'radius' | 'shadow' | 'blur' | 'unknown';
 
@@ -63,6 +63,7 @@ export interface ConvexComponent {
   version: string;
   code: string;
   docs: string;
+  storybook?: string;
 }
 
 export interface DeploymentStatus {

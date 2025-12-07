@@ -1,27 +1,36 @@
 {
-  "functions": {
-    "api/screenshot.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    },
-    "api/image-diff.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    },
-    "api/accessibility.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/screenshot",
-      "destination": "/api/screenshot.ts"
-    },
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30
+    }
+  },
+  "headers": [
     {
-      "source": "/api/image-diff",
-      "destination": "/api/image-diff.ts"
-    },
-    {
-      "source": "/api/accessibility",
-      "destination": "/api/accessibility.ts"
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
     }
   ]
 }

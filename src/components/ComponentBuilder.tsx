@@ -33,6 +33,7 @@ interface ExtractionResult {
   description?: string;
   code: string;
   css: string;
+  storybook?: string; // Storybook story code
   variants: ExtractedVariant[];
   extractedProperties: Record<string, any>;
   usedVariables: Array<{ name: string; value: string; type?: string }>;
@@ -48,8 +49,20 @@ const ComponentPreview: React.FC<{
   tokens: Token[];
   componentName?: string;
 }> = ({ code, css, tokens, componentName = 'Component' }) => {
-  const [previewMode, setPreviewMode] = useState<'sandbox' | 'static'>('static');
+  const [previewMode, setPreviewMode] = useState<'sandbox' | 'static'>('sandbox'); // Default to sandbox for better rendering
   const [error, setError] = useState<string | null>(null);
+  
+  // Log preview data for debugging
+  React.useEffect(() => {
+    console.log('[PREVIEW] ========================================');
+    console.log('[PREVIEW] Component name:', componentName);
+    console.log('[PREVIEW] Code length:', code?.length || 0);
+    console.log('[PREVIEW] CSS length:', css?.length || 0);
+    console.log('[PREVIEW] Tokens count:', tokens?.length || 0);
+    console.log('[PREVIEW] Code (first 1000 chars):', code?.substring(0, 1000));
+    console.log('[PREVIEW] CSS (first 1000 chars):', css?.substring(0, 1000));
+    console.log('[PREVIEW] ========================================');
+  }, [code, css, componentName, tokens]);
   
   // Extract CSS properties from the generated code/css for a static preview
   const extractedStyles = React.useMemo(() => {
@@ -104,7 +117,10 @@ const ComponentPreview: React.FC<{
 <body>
   <div class="preview-label">${componentName} Preview</div>
   <div class="component-preview" style="${extractedStyles}">
-    <span>Button</span>
+    <!-- Component will be rendered via Sandpack preview -->
+    <div style="padding: 20px; text-align: center; color: #666;">
+      Switch to "Sandbox" mode to see the interactive preview
+    </div>
   </div>
 </body>
 </html>`;
@@ -128,10 +144,20 @@ const ComponentPreview: React.FC<{
     
     // Check if the component is exported, if not wrap it
     const hasExport = cleanedCode.includes('export const') || cleanedCode.includes('export function');
+    console.log('[SANDPACK] Component export check:', { hasExport, componentName, cleanedCodeLength: cleanedCode.length });
+    console.log('[SANDPACK] Code preview (first 500 chars):', cleanedCode.substring(0, 500));
+    
     if (!hasExport && componentName) {
       // Try to find the component definition and export it
       const componentPattern = new RegExp(`(const|function)\\s+${componentName}`, 'g');
-      cleanedCode = cleanedCode.replace(componentPattern, `export $1 ${componentName}`);
+      if (componentPattern.test(cleanedCode)) {
+        cleanedCode = cleanedCode.replace(componentPattern, `export $1 ${componentName}`);
+        console.log('[SANDPACK] Added export to component');
+      } else {
+        console.warn('[SANDPACK] Component definition not found in code!');
+        console.warn('[SANDPACK] Searching for:', componentName);
+        console.warn('[SANDPACK] Full code:', cleanedCode);
+      }
     }
     
     // Build the App file with proper structure
@@ -166,7 +192,7 @@ export default function App() {
         ${componentName} Preview
       </span>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <${componentName}>Button</${componentName}>
+        <${componentName} />
       </div>
     </div>
   );
@@ -445,16 +471,51 @@ interface SavedComponent {
   version: string;
   code: string;
   docs?: string;
+  storybook?: string;
+  progressId?: Id<"extractionProgress">;
 }
 
 const SavedComponentView: React.FC<{
   component: SavedComponent;
   tokens: Token[];
-  activeTab: 'preview' | 'code' | 'inspect';
-  setActiveTab: (tab: 'preview' | 'code' | 'inspect') => void;
+  activeTab: 'preview' | 'code' | 'inspect' | 'log';
+  setActiveTab: (tab: 'preview' | 'code' | 'inspect' | 'log') => void;
   onFeedback: (feedback: string) => void;
   isRefining: boolean;
-}> = ({ component, tokens, activeTab, setActiveTab, onFeedback, isRefining }) => {
+  onRename?: (id: Id<"components">, name: string) => void;
+  onVersionChange?: (id: Id<"components">, version: string) => void;
+  onDelete?: (id: Id<"components">) => void;
+  tenantId?: Id<"tenants">;
+  userId?: Id<"users">;
+}> = ({ component, tokens, activeTab, setActiveTab, onFeedback, isRefining, onRename, onVersionChange, onDelete, tenantId, userId }) => {
+  const { tenantId: tenantIdFromContext, userId: userIdFromContext } = useTenant();
+  const effectiveTenantId = tenantId || tenantIdFromContext;
+  const effectiveUserId = userId || userIdFromContext;
+  
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isEditingVersion, setIsEditingVersion] = useState(false);
+  const [editName, setEditName] = useState(component.name);
+  const [editVersion, setEditVersion] = useState(component.version);
+  
+  // Get progress if component has progressId
+  const progress = useQuery(
+    api.extractionProgress.get,
+    component.progressId ? { progressId: component.progressId } : "skip"
+  );
+  
+  const handleRename = async () => {
+    if (editName.trim() && editName !== component.name && onRename && effectiveTenantId && effectiveUserId) {
+      await onRename(component._id, editName.trim());
+      setIsRenaming(false);
+    }
+  };
+  
+  const handleVersionChange = async () => {
+    if (editVersion.trim() && editVersion !== component.version && onVersionChange && effectiveTenantId && effectiveUserId) {
+      await onVersionChange(component._id, editVersion.trim());
+      setIsEditingVersion(false);
+    }
+  };
   
   // Extract CSS from docs if present (looks for ```css blocks)
   const extractedCss = React.useMemo(() => {
@@ -508,23 +569,89 @@ const SavedComponentView: React.FC<{
     <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
-            {component.name.charAt(0)}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{component.name}</h3>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${
-                component.status === 'stable' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
-                component.status === 'review' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400' :
-                'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-              }`}>
-                {component.status}
-              </span>
-              <span className="text-[10px] text-zinc-400 font-mono">v{component.version}</span>
+        <div className="flex-1">
+          {isRenaming ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') {
+                    setEditName(component.name);
+                    setIsRenaming(false);
+                  }
+                }}
+                autoFocus
+                className="text-lg font-semibold bg-transparent border-b border-violet-500 text-zinc-900 dark:text-white focus:outline-none"
+              />
             </div>
+          ) : (
+            <h3 
+              className="text-lg font-semibold text-zinc-900 dark:text-white cursor-pointer hover:text-violet-600 dark:hover:text-violet-400"
+              onClick={() => setIsRenaming(true)}
+              title="Click to rename"
+            >
+              {component.name}
+            </h3>
+          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${
+              component.status === 'stable' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
+              component.status === 'review' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400' :
+              'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+            }`}>
+              {component.status}
+            </span>
+            {isEditingVersion ? (
+              <input
+                type="text"
+                value={editVersion}
+                onChange={(e) => setEditVersion(e.target.value)}
+                onBlur={handleVersionChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleVersionChange();
+                  if (e.key === 'Escape') {
+                    setEditVersion(component.version);
+                    setIsEditingVersion(false);
+                  }
+                }}
+                autoFocus
+                className="text-[10px] font-mono bg-transparent border-b border-violet-500 text-zinc-400 focus:outline-none w-16"
+              />
+            ) : (
+              <span 
+                className="text-[10px] text-zinc-400 font-mono cursor-pointer hover:text-violet-600 dark:hover:text-violet-400"
+                onClick={() => setIsEditingVersion(true)}
+                title="Click to edit version"
+              >
+                v{component.version}
+              </span>
+            )}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {component.storybook && (
+            <a
+              href={`/storybook?component=${encodeURIComponent(component.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 px-3 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink size={12} />
+              Open in Storybook
+            </a>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(component._id)}
+              className="h-8 px-3 text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
         </div>
       </div>
       
@@ -534,6 +661,7 @@ const SavedComponentView: React.FC<{
           { id: 'preview', label: 'Preview', icon: <Eye size={14} /> },
           { id: 'code', label: 'Code', icon: <Code size={14} /> },
           { id: 'inspect', label: 'Inspect', icon: <Settings2 size={14} /> },
+          { id: 'log', label: 'Log', icon: <RefreshCw size={14} /> },
         ].map(tab => (
           <button
             key={tab.id}
@@ -618,6 +746,70 @@ const SavedComponentView: React.FC<{
               properties={extractedProperties}
               usedVariables={usedVariables}
             />
+          )}
+          
+          {activeTab === 'log' && (
+            <div className="h-full p-4 overflow-auto">
+              {progress ? (
+                <div className="space-y-2">
+                  {progress.steps.map((step, index) => {
+                    const isActive = step.status === "in_progress";
+                    const isCompleted = step.status === "completed";
+                    const isFailed = step.status === "failed";
+                    const isPending = step.status === "pending";
+                    
+                    return (
+                      <div
+                        key={step.id}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg text-xs transition-all ${
+                          isActive
+                            ? "bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30"
+                            : isCompleted
+                            ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30"
+                            : isFailed
+                            ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30"
+                            : "bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50"
+                        }`}
+                      >
+                        <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                          {isActive ? (
+                            <Loader2 size={14} className="animate-spin text-violet-600 dark:text-violet-400" />
+                          ) : isCompleted ? (
+                            <Check size={14} className="text-green-600 dark:text-green-400" />
+                          ) : isFailed ? (
+                            <X size={14} className="text-red-600 dark:text-red-400" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium ${
+                            isActive
+                              ? "text-violet-900 dark:text-violet-300"
+                              : isCompleted
+                              ? "text-green-900 dark:text-green-300"
+                              : isFailed
+                              ? "text-red-900 dark:text-red-300"
+                              : "text-zinc-500 dark:text-zinc-400"
+                          }`}>
+                            {step.label}
+                          </div>
+                          {step.details && (
+                            <div className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                              {step.details}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">No extraction log available</p>
+                </div>
+              )}
+            </div>
           )}
         </div>
         
@@ -732,7 +924,8 @@ export const ComponentBuilder: React.FC = () => {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [extractedResult, setExtractedResult] = useState<ExtractionResult | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ExtractedVariant | null>(null);
-  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect'>('preview');
+  const [progressId, setProgressId] = useState<Id<"extractionProgress"> | null>(null);
+  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect' | 'log'>('preview');
   const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   
@@ -807,8 +1000,17 @@ export const ComponentBuilder: React.FC = () => {
   
   // Convex mutations & actions
   const createComponent = useMutation(api.components.create);
+  const updateComponent = useMutation(api.components.update);
   const removeComponent = useMutation(api.components.remove);
   const extractAndBuild = useAction(api.claudeExtraction.extractAndBuildComponent);
+  const createProgress = useMutation(api.extractionProgress.create);
+  const removeProgress = useMutation(api.extractionProgress.remove);
+  
+  // Get progress updates
+  const progress = useQuery(
+    api.extractionProgress.get,
+    progressId ? { progressId } : "skip"
+  );
   
   // Get selected saved component
   const selectedSavedComponent = components?.find(c => c._id === selectedComponentId);
@@ -820,49 +1022,103 @@ export const ComponentBuilder: React.FC = () => {
     setIsExtracting(true);
     setExtractionError(null);
     
+    console.log('[COMPONENT BUILDER] Starting extraction...');
+    console.log('[COMPONENT BUILDER] Figma URL:', figmaUrl);
+    console.log('[COMPONENT BUILDER] Project ID:', projectId);
+    console.log('[COMPONENT BUILDER] Tenant ID:', effectiveTenantId);
+    
+    let componentId: Id<"components"> | null = null;
+    let newProgressId: Id<"extractionProgress"> | null = null;
+    
     try {
-      const result = await extractAndBuild({
+      // Create progress tracker
+      newProgressId = await createProgress({
         projectId,
         tenantId: effectiveTenantId,
         userId: effectiveUserId,
         figmaUrl,
       });
+      setProgressId(newProgressId);
+      
+      // Extract component name from Figma URL for initial component creation
+      const urlMatch = figmaUrl.match(/node-id=([^&]+)/);
+      const nodeId = urlMatch ? urlMatch[1] : 'unknown';
+      const tempName = `Component-${Date.now()}`;
+      
+      // Create component immediately with placeholder data
+      componentId = await createComponent({
+        projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        name: tempName,
+        status: 'draft',
+        version: '0.0.0',
+        code: '// Component extraction in progress...',
+        docs: `## ${tempName}\n\nExtracting from Figma...`,
+        progressId: newProgressId,
+      });
+      
+      setSelectedComponentId(componentId);
+      
+      // Start extraction with progress tracking
+      const result = await extractAndBuild({
+        projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        figmaUrl,
+        progressId: newProgressId,
+      });
+      
+      console.log('[COMPONENT BUILDER] Extraction successful!');
+      console.log('[COMPONENT BUILDER] Component name:', result.name);
+      console.log('[COMPONENT BUILDER] Code length:', result.code?.length || 0);
+      console.log('[COMPONENT BUILDER] CSS length:', result.css?.length || 0);
+      console.log('[COMPONENT BUILDER] Variants:', result.variants?.length || 0);
+      
+      // Update component with extracted data
+      if (componentId) {
+        await updateComponent({
+          id: componentId,
+          tenantId: effectiveTenantId,
+          userId: effectiveUserId,
+          name: result.name,
+          version: '1.0.0',
+          code: result.code,
+          docs: `## ${result.name}\n\n${result.description || ''}\n\n### CSS\n\`\`\`css\n${result.css}\n\`\`\``,
+          storybook: result.storybook || undefined,
+          progressId: newProgressId, // Preserve progressId for Log tab
+        });
+      }
       
       setExtractedResult(result);
       if (result.variants?.length > 0) {
         setSelectedVariant(result.variants[0]);
       }
+      
+      // Don't clean up progress - keep it for Log tab
     } catch (error: any) {
-      console.error('Extraction failed:', error);
+      console.error('[COMPONENT BUILDER] Extraction failed:', error);
+      console.error('[COMPONENT BUILDER] Error stack:', error?.stack);
       setExtractionError(error.message || 'Failed to extract component');
+      
+      // Delete component if extraction failed
+      if (componentId) {
+        try {
+          await removeComponent({ id: componentId, tenantId: effectiveTenantId!, userId: effectiveUserId! });
+        } catch (e) {
+          console.error('Failed to delete component on error:', e);
+        }
+      }
+      
+      // Clean up progress on error
+      if (newProgressId) {
+        removeProgress({ progressId: newProgressId });
+        setProgressId(null);
+      }
     } finally {
       setIsExtracting(false);
     }
   };
-  
-  // Handle save component
-  const handleSaveComponent = async () => {
-    if (!extractedResult || !projectId) return;
-    
-    try {
-      const newId = await createComponent({
-        projectId,
-        tenantId: effectiveTenantId,
-        userId: effectiveUserId,
-        name: extractedResult.name,
-        status: 'draft',
-        version: '1.0.0',
-        code: extractedResult.code,
-        docs: `## ${extractedResult.name}\n\n${extractedResult.description || ''}\n\n### CSS\n\`\`\`css\n${extractedResult.css}\n\`\`\``,
-      });
-      
-      setSelectedComponentId(newId);
-      
-    } catch (error) {
-      console.error('Failed to save component:', error);
-    }
-  };
-  
   // Handle delete component
   const handleDeleteComponent = async (id: Id<"components">) => {
     try {
@@ -881,14 +1137,6 @@ export const ComponentBuilder: React.FC = () => {
     // TODO: Implement refinement with Claude
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsRefining(false);
-  };
-  
-  // Reset
-  const handleReset = () => {
-    setExtractedResult(null);
-    setSelectedVariant(null);
-    setFigmaUrl('');
-    setExtractionError(null);
   };
   
   return (
@@ -954,6 +1202,21 @@ export const ComponentBuilder: React.FC = () => {
               {extractionError}
             </div>
           )}
+          
+          {/* Storybook Link - Show after successful extraction */}
+          {extractedResult && extractedResult.storybook && (
+            <div className="mt-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800/60">
+              <a
+                href={`/storybook?component=${encodeURIComponent(extractedResult.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full h-8 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ExternalLink size={12} />
+                Open in Storybook
+              </a>
+            </div>
+          )}
         </div>
         
         {/* Saved Components List */}
@@ -1012,21 +1275,77 @@ export const ComponentBuilder: React.FC = () => {
       
       {/* Main Content Area */}
       {isExtracting ? (
-        // Extracting state
-        <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-900">
-          <div className="text-center max-w-md px-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-6 animate-pulse">
-              <Sparkles size={32} className="text-white" />
+        // Extracting state with real-time progress
+        <div className="flex-1 flex items-center justify-center bg-white dark:bg-zinc-900 p-8 overflow-y-auto">
+          <div className="w-full max-w-lg">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={24} className="text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+                {progress?.currentStep || "Extracting component..."}
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {progress?.status === "fetching" && "Fetching data from Figma..."}
+                {progress?.status === "extracting" && "Analyzing design properties..."}
+                {progress?.status === "generating" && "Generating production-ready code..."}
+                {!progress && "Initializing extraction..."}
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Claude is extracting...
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              Analyzing Figma design, extracting properties, and generating production-ready React code.
-            </p>
-            <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
-              <Loader2 size={14} className="animate-spin" />
-              This may take 10-30 seconds
+            
+            {/* Progress Steps */}
+            <div className="space-y-2">
+              {progress?.steps.map((step, index) => {
+                const isActive = step.status === "in_progress";
+                const isCompleted = step.status === "completed";
+                const isFailed = step.status === "failed";
+                const isPending = step.status === "pending";
+                
+                return (
+                  <div
+                    key={step.id}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg text-xs transition-all ${
+                      isActive
+                        ? "bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30"
+                        : isCompleted
+                        ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30"
+                        : isFailed
+                        ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30"
+                        : "bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50"
+                    }`}
+                  >
+                    <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                      {isActive ? (
+                        <Loader2 size={14} className="animate-spin text-violet-600 dark:text-violet-400" />
+                      ) : isCompleted ? (
+                        <Check size={14} className="text-green-600 dark:text-green-400" />
+                      ) : isFailed ? (
+                        <X size={14} className="text-red-600 dark:text-red-400" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-medium ${
+                        isActive
+                          ? "text-violet-900 dark:text-violet-300"
+                          : isCompleted
+                          ? "text-green-900 dark:text-green-300"
+                          : isFailed
+                          ? "text-red-900 dark:text-red-300"
+                          : "text-zinc-500 dark:text-zinc-400"
+                      }`}>
+                        {step.label}
+                      </div>
+                      {step.details && (
+                        <div className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {step.details}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1034,29 +1353,21 @@ export const ComponentBuilder: React.FC = () => {
         <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden">
           {/* Header */}
           <div className="p-4 border-b border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                {extractedResult.name.charAt(0)}
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.name}</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedResult.description}</p>
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.name}</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedResult.description}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSaveComponent}
-                className="h-8 px-3 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:opacity-90 flex items-center gap-1.5"
+            {extractedResult.storybook && (
+              <a
+                href={`/storybook?component=${encodeURIComponent(extractedResult.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-8 px-3 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center gap-1.5 transition-colors"
               >
-                <Check size={12} /> Save Component
-              </button>
-              <button
-                onClick={handleReset}
-                className="h-8 px-3 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
-              >
-                <X size={12} /> Discard
-              </button>
-            </div>
+                <ExternalLink size={12} />
+                Open in Storybook
+              </a>
+            )}
           </div>
           
           {/* Variant Selector */}
@@ -1072,6 +1383,7 @@ export const ComponentBuilder: React.FC = () => {
               { id: 'preview', label: 'Preview', icon: <Eye size={14} /> },
               { id: 'code', label: 'Code', icon: <Code size={14} /> },
               { id: 'inspect', label: 'Inspect', icon: <Settings2 size={14} /> },
+              { id: 'log', label: 'Log', icon: <RefreshCw size={14} /> },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1145,6 +1457,64 @@ export const ComponentBuilder: React.FC = () => {
                   usedVariables={extractedResult.usedVariables}
                 />
               )}
+              
+              {activeTab === 'log' && progress && (
+                <div className="h-full p-4 overflow-auto">
+                  <div className="space-y-2">
+                    {progress.steps.map((step, index) => {
+                      const isActive = step.status === "in_progress";
+                      const isCompleted = step.status === "completed";
+                      const isFailed = step.status === "failed";
+                      const isPending = step.status === "pending";
+                      
+                      return (
+                        <div
+                          key={step.id}
+                          className={`flex items-center gap-3 p-2.5 rounded-lg text-xs transition-all ${
+                            isActive
+                              ? "bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30"
+                              : isCompleted
+                              ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30"
+                              : isFailed
+                              ? "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30"
+                              : "bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50"
+                          }`}
+                        >
+                          <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                            {isActive ? (
+                              <Loader2 size={14} className="animate-spin text-violet-600 dark:text-violet-400" />
+                            ) : isCompleted ? (
+                              <Check size={14} className="text-green-600 dark:text-green-400" />
+                            ) : isFailed ? (
+                              <X size={14} className="text-red-600 dark:text-red-400" />
+                            ) : (
+                              <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-medium ${
+                              isActive
+                                ? "text-violet-900 dark:text-violet-300"
+                                : isCompleted
+                                ? "text-green-900 dark:text-green-300"
+                                : isFailed
+                                ? "text-red-900 dark:text-red-300"
+                                : "text-zinc-500 dark:text-zinc-400"
+                            }`}>
+                              {step.label}
+                            </div>
+                            {step.details && (
+                              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                                {step.details}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Right Sidebar - Used Variables & Feedback */}
@@ -1197,6 +1567,15 @@ export const ComponentBuilder: React.FC = () => {
           setActiveTab={setActiveTab}
           onFeedback={handleFeedback}
           isRefining={isRefining}
+          onRename={async (id, name) => {
+            await updateComponent({ id, tenantId: effectiveTenantId!, userId: effectiveUserId!, name });
+          }}
+          onVersionChange={async (id, version) => {
+            await updateComponent({ id, tenantId: effectiveTenantId!, userId: effectiveUserId!, version });
+          }}
+          onDelete={handleDeleteComponent}
+          tenantId={effectiveTenantId}
+          userId={effectiveUserId}
         />
       ) : (
         // Empty state

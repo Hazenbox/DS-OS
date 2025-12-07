@@ -4,6 +4,7 @@ import { IRS, IRT, IML } from "../src/types/ir";
 import { gradientToCSS, handleNestedGradient } from "./gradientUtils";
 import { generateBlendModeCSS, requiresIsolation } from "./blendModeUtils";
 import { renderIRSTree } from "./nodeRenderer";
+import { normalizeTokenName } from "./tokenCompiler";
 
 // ============================================================================
 // CODE GENERATOR - Deterministic Template Engine
@@ -178,17 +179,41 @@ function generateComponent(
   
   component += `  const componentClassName = ${className};\n\n`;
   
+  // Build token map from IRT for use in rendering (shared across all component types)
+  const sharedTokenMap: Record<string, string> = {};
+  if (irt && irt.tokens && irt.tokens.length > 0) {
+    console.log(`[CODE GEN] Building token map from ${irt.tokens.length} tokens`);
+    for (const token of irt.tokens) {
+      const cssVar = `var(--${normalizeTokenName(token.name)})`;
+      if (!sharedTokenMap[token.type]) {
+        sharedTokenMap[token.type] = cssVar;
+      }
+      sharedTokenMap[normalizeTokenName(token.name)] = cssVar;
+      if (token.type === 'color') {
+        sharedTokenMap['fill'] = cssVar;
+        sharedTokenMap['background'] = cssVar;
+      } else if (token.type === 'spacing') {
+        sharedTokenMap['gap'] = cssVar;
+        sharedTokenMap['padding'] = cssVar;
+      } else if (token.type === 'sizing') {
+        sharedTokenMap['width'] = cssVar;
+        sharedTokenMap['height'] = cssVar;
+      }
+    }
+    console.log(`[CODE GEN] Token map built with ${Object.keys(sharedTokenMap).length} entries`);
+  }
+  
   // Generate component body based on category
   if (iml.componentCategory === 'button' || iml.componentCategory === 'iconButton') {
-    component += generateButtonComponent(componentName, irs, iml, ariaAttrs);
+    component += generateButtonComponent(componentName, irs, irt, iml, ariaAttrs, sharedTokenMap);
   } else if (iml.componentCategory === 'input') {
-    component += generateInputComponent(componentName, irs, iml, ariaAttrs);
+    component += generateInputComponent(componentName, irs, irt, iml, ariaAttrs, sharedTokenMap);
   } else if (iml.componentCategory === 'combobox' || iml.componentCategory === 'select') {
-    component += generateComboboxComponent(componentName, irs, iml, ariaAttrs);
+    component += generateComboboxComponent(componentName, irs, irt, iml, ariaAttrs, sharedTokenMap);
   } else if (iml.componentCategory === 'dialog' || iml.componentCategory === 'modal') {
-    component += generateDialogComponent(componentName, irs, iml, ariaAttrs);
+    component += generateDialogComponent(componentName, irs, irt, iml, ariaAttrs, sharedTokenMap);
   } else {
-    component += generateGenericComponent(componentName, irs, iml, ariaAttrs);
+    component += generateGenericComponent(componentName, irs, irt, iml, ariaAttrs, sharedTokenMap);
   }
   
   component += `};\n`;
@@ -202,8 +227,10 @@ function generateComponent(
 function generateButtonComponent(
   componentName: string,
   irs: IRS,
+  irt: IRT,
   iml: IML,
-  ariaAttrs: string
+  ariaAttrs: string,
+  tokenMap?: Record<string, string>
 ): string {
   let code = `  return (\n`;
   code += `    <button\n`;
@@ -253,11 +280,45 @@ function generateButtonComponent(
   const labelSlot = irs.slots.find(s => s.name === 'label' || s.name === 'labelText');
   const iconSlot = irs.slots.find(s => s.name === 'icon');
   
+  console.log(`[CODE GEN] Button component - slots: label=${!!labelSlot}, icon=${!!iconSlot}`);
+  console.log(`[CODE GEN] Button component - IRS tree: ${irs.tree?.length || 0} nodes`);
+  if (irs.tree && irs.tree.length > 0) {
+    console.log(`[CODE GEN] Button component - root node children: ${irs.tree[0].children?.length || 0}`);
+  }
+  
   code += `    >\n`;
   
-  if (iconSlot && iml.componentCategory === 'iconButton') {
+  // Build token map from IRT for use in rendering (if not provided)
+  const buttonTokenMap: Record<string, string> = tokenMap || {};
+  if (irt && irt.tokens && irt.tokens.length > 0 && !tokenMap) {
+    for (const token of irt.tokens) {
+      const cssVar = `var(--${normalizeTokenName(token.name)})`;
+      if (!buttonTokenMap[token.type]) {
+        buttonTokenMap[token.type] = cssVar;
+      }
+      buttonTokenMap[normalizeTokenName(token.name)] = cssVar;
+      if (token.type === 'color') {
+        buttonTokenMap['fill'] = cssVar;
+        buttonTokenMap['background'] = cssVar;
+      } else if (token.type === 'spacing') {
+        buttonTokenMap['gap'] = cssVar;
+        buttonTokenMap['padding'] = cssVar;
+      } else if (token.type === 'sizing') {
+        buttonTokenMap['width'] = cssVar;
+        buttonTokenMap['height'] = cssVar;
+      }
+    }
+  }
+  
+  // Priority: IRS tree children > Slots > children prop
+  if (irs.tree && irs.tree.length > 0 && irs.tree[0].children && irs.tree[0].children.length > 0) {
+    console.log(`[CODE GEN] Button: Rendering IRS tree children (${irs.tree[0].children.length} nodes)`);
+    code += renderIRSTree(irs.tree[0].children, componentName, 6, buttonTokenMap);
+  } else if (iconSlot && iml.componentCategory === 'iconButton') {
+    console.log(`[CODE GEN] Button: Using icon slot`);
     code += `      {${iconSlot.name} || children}\n`;
   } else {
+    console.log(`[CODE GEN] Button: Using slots/children fallback`);
     if (iconSlot) {
       code += `      {${iconSlot.name} && <span className="${componentName.toLowerCase()}__icon">{${iconSlot.name}}</span>}\n`;
     }
@@ -280,8 +341,10 @@ function generateButtonComponent(
 function generateInputComponent(
   componentName: string,
   irs: IRS,
+  irt: IRT,
   iml: IML,
-  ariaAttrs: string
+  ariaAttrs: string,
+  tokenMap?: Record<string, string>
 ): string {
   let code = `  return (\n`;
   code += `    <div className={\`${componentName.toLowerCase()}__wrapper\`}>\n`;
@@ -328,8 +391,10 @@ function generateInputComponent(
 function generateComboboxComponent(
   componentName: string,
   irs: IRS,
+  irt: IRT,
   iml: IML,
-  ariaAttrs: string
+  ariaAttrs: string,
+  tokenMap?: Record<string, string>
 ): string {
   let code = `  const [open, setOpen] = React.useState(false);\n`;
   code += `  const [value, setValue] = React.useState<string>('');\n\n`;
@@ -353,8 +418,10 @@ function generateComboboxComponent(
 function generateDialogComponent(
   componentName: string,
   irs: IRS,
+  irt: IRT,
   iml: IML,
-  ariaAttrs: string
+  ariaAttrs: string,
+  tokenMap?: Record<string, string>
 ): string {
   let code = `  const [open, setOpen] = React.useState(false);\n\n`;
   code += `  return (\n`;
@@ -380,25 +447,85 @@ function generateDialogComponent(
 function generateGenericComponent(
   componentName: string,
   irs: IRS,
+  irt: IRT,
   iml: IML,
-  ariaAttrs: string
+  ariaAttrs: string,
+  tokenMap?: Record<string, string>
 ): string {
+  console.log(`[CODE GEN] Generating generic component: ${componentName}`);
+  console.log(`[CODE GEN] IRS tree length: ${irs.tree?.length || 0}`);
+  console.log(`[CODE GEN] Component type: ${irs.meta.componentType}`);
+  console.log(`[CODE GEN] Variants count: ${irs.variants.length}`);
+  
+  // Get root node and its children
+  const rootNode = irs.tree && irs.tree.length > 0 ? irs.tree[0] : null;
+  const hasChildren = rootNode?.children && rootNode.children.length > 0;
+  
+  console.log(`[CODE GEN] Root node:`, rootNode ? { name: rootNode.name, type: rootNode.type, children: rootNode.children?.length || 0 } : 'null');
+  console.log(`[CODE GEN] Has children: ${hasChildren}`);
+  console.log(`[CODE GEN] Is component set: ${irs.meta.componentType === 'component-set'}`);
+  
   let code = `  return (\n`;
   code += `    <div\n`;
   code += `      className={componentClassName}\n`;
   code += `      ${ariaAttrs}\n`;
   code += `    >\n`;
   
-  // Render IRS tree (handles vector graphics, text on path, and regular nodes)
-  if (irs.tree && irs.tree.length > 0) {
-    code += renderIRSTree(irs.tree, componentName, 6);
+  // Build token map from IRT for use in rendering (if not provided)
+  const genericTokenMap: Record<string, string> = tokenMap || {};
+  if (irt && irt.tokens && irt.tokens.length > 0 && !tokenMap) {
+    console.log(`[CODE GEN] Building token map from ${irt.tokens.length} tokens`);
+    for (const token of irt.tokens) {
+      const cssVar = `var(--${normalizeTokenName(token.name)})`;
+      if (!genericTokenMap[token.type]) {
+        genericTokenMap[token.type] = cssVar;
+      }
+      genericTokenMap[normalizeTokenName(token.name)] = cssVar;
+      if (token.type === 'color') {
+        genericTokenMap['fill'] = cssVar;
+        genericTokenMap['background'] = cssVar;
+      } else if (token.type === 'spacing') {
+        genericTokenMap['gap'] = cssVar;
+        genericTokenMap['padding'] = cssVar;
+      } else if (token.type === 'sizing') {
+        genericTokenMap['width'] = cssVar;
+        genericTokenMap['height'] = cssVar;
+      }
+    }
+    console.log(`[CODE GEN] Token map built with ${Object.keys(genericTokenMap).length} entries`);
+  } else if (!tokenMap) {
+    console.log(`[CODE GEN] No tokens available in IRT, using hardcoded values`);
+  }
+  
+  // Handle component sets - render only the first variant child
+  // Component sets have multiple variant children, but we should only render one
+  if (irs.meta.componentType === 'component-set' && rootNode && rootNode.children && rootNode.children.length > 0) {
+    console.log(`[CODE GEN] Component set detected with ${rootNode.children.length} variant children`);
+    console.log(`[CODE GEN] Rendering first variant child (${rootNode.children[0].name})`);
+    // Render only the first variant child
+    const renderedTree = renderIRSTree([rootNode.children[0]], componentName, 6, genericTokenMap);
+    code += renderedTree;
+  } else if (rootNode && rootNode.children && rootNode.children.length > 0) {
+    // Regular component - render all children
+    console.log(`[CODE GEN] Rendering ${rootNode.children.length} children of root node`);
+    const renderedTree = renderIRSTree(rootNode.children, componentName, 6, genericTokenMap);
+    console.log(`[CODE GEN] Rendered IRS tree (${renderedTree.length} chars):`, renderedTree.substring(0, 500));
+    code += renderedTree;
+  } else if (irs.tree && irs.tree.length > 0) {
+    // Fallback: render the entire tree (shouldn't happen, but just in case)
+    console.log(`[CODE GEN] Fallback: Rendering entire IRS tree`);
+    const renderedTree = renderIRSTree(irs.tree, componentName, 6, genericTokenMap);
+    code += renderedTree;
   } else {
+    console.log(`[CODE GEN] No IRS tree or children, using children prop fallback`);
     code += `      {children}\n`;
   }
   
   code += `    </div>\n`;
   code += `  );\n`;
   
+  console.log(`[CODE GEN] Generated component code (${code.length} chars)`);
+  console.log(`[CODE GEN] Full component code:`, code);
   return code;
 }
 

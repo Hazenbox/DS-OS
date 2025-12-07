@@ -241,7 +241,8 @@ export default defineSchema({
     tenantId: v.id("tenants"), // Required - fresh start
     projectId: v.id("projects"),
     name: v.string(),
-    value: v.string(),
+    value: v.string(), // Default value (for backward compatibility)
+    valueByMode: v.optional(v.any()), // Mode-specific values: { "light": "#fff", "dark": "#000" }
     type: v.union(
       v.literal("color"),
       v.literal("typography"),
@@ -255,6 +256,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     brand: v.optional(v.string()),
     sourceFileId: v.optional(v.id("tokenFiles")), // Link to source file
+    modes: v.optional(v.array(v.string())), // Available modes: ["light", "dark"]
   })
     .index("by_tenant", ["tenantId"])
     .index("by_project", ["projectId"])
@@ -263,6 +265,28 @@ export default defineSchema({
     .index("by_type", ["type"])
     .index("by_brand", ["brand"])
     .index("by_source_file", ["sourceFileId"]),
+
+  // Token Bundles - Compiled CSS/JSON bundles for themes and components
+  tokenBundles: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    type: v.union(v.literal("global"), v.literal("component")),
+    componentId: v.optional(v.id("components")), // For component bundles
+    version: v.string(),
+    cssContent: v.optional(v.string()), // CSS with :root variables (fallback, prefer CDN)
+    jsonContent: v.string(), // JSON token map (fallback, prefer CDN)
+    cssUrl: v.optional(v.string()), // CDN URL for CSS bundle
+    jsonUrl: v.optional(v.string()), // CDN URL for JSON bundle
+    tokenCount: v.number(),
+    modes: v.optional(v.array(v.string())), // e.g., ["light", "dark"]
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_project", ["projectId"])
+    .index("by_tenant_project", ["tenantId", "projectId"])
+    .index("by_project_type", ["projectId", "type"])
+    .index("by_component", ["componentId"]),
 
   // Components - scoped to project
   components: defineTable({
@@ -278,6 +302,8 @@ export default defineSchema({
     version: v.string(),
     code: v.string(),
     docs: v.string(),
+    storybook: v.optional(v.string()), // Storybook story code
+    progressId: v.optional(v.id("extractionProgress")), // Link to extraction progress for Log tab
   })
     .index("by_tenant", ["tenantId"])
     .index("by_project", ["projectId"])
@@ -366,6 +392,7 @@ export default defineSchema({
         nodes: v.array(v.string()),
       })),
       testedAt: v.number(),
+      score: v.optional(v.number()), // 0-100 accessibility score
     }))),
     componentApprovals: v.optional(v.array(v.object({
       componentId: v.string(),
@@ -508,4 +535,36 @@ export default defineSchema({
     .index("by_tenant_project", ["tenantId", "projectId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_user", ["userId"]),
+
+  // ============================================================================
+  // EXTRACTION PROGRESS TRACKING
+  // ============================================================================
+  
+  extractionProgress: defineTable({
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    figmaUrl: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("fetching"),
+      v.literal("extracting"),
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    currentStep: v.string(),
+    steps: v.array(v.object({
+      id: v.string(),
+      label: v.string(),
+      status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
+      details: v.optional(v.string()),
+    })),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"]),
 });

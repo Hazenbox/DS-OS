@@ -10,6 +10,7 @@ import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { OAuthCallback } from './components/OAuthCallback';
 import { ProjectModal } from './components/ProjectModal';
+import { StorybookViewer } from './components/StorybookViewer';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { TenantProvider, useTenant } from './contexts/TenantContext';
 import { ViewState } from './types';
@@ -37,6 +38,7 @@ const pathToView: Record<string, ViewState> = {
   '/documentation': 'documentation',
   '/feedback': 'feedback',
   '/projects': 'projects',
+  '/storybook': 'storybook',
 };
 
 const viewToPath: Record<ViewState, string> = {
@@ -48,6 +50,7 @@ const viewToPath: Record<ViewState, string> = {
   'documentation': '/documentation',
   'feedback': '/feedback',
   'projects': '/projects',
+  'storybook': '/storybook',
 };
 
 // Get initial view from URL
@@ -196,6 +199,11 @@ const AppContent: React.FC<{
                 </div>
             </div>
           );
+      case 'storybook':
+        // Extract component name from URL query params
+        const urlParams = new URLSearchParams(window.location.search);
+        const componentName = urlParams.get('component') || undefined;
+        return <StorybookViewer componentName={componentName} />;
       default:
         return <Dashboard />;
     }
