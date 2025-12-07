@@ -1,0 +1,27 @@
+{
+  "functions": {
+    "api/screenshot.ts": {
+      "runtime": "@vercel/node@3.0.0"
+    },
+    "api/image-diff.ts": {
+      "runtime": "@vercel/node@3.0.0"
+    },
+    "api/accessibility.ts": {
+      "runtime": "@vercel/node@3.0.0"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/screenshot",
+      "destination": "/api/screenshot.ts"
+    },
+    {
+      "source": "/api/image-diff",
+      "destination": "/api/image-diff.ts"
+    },
+    {
+      "source": "/api/accessibility",
+      "destination": "/api/accessibility.ts"
+    }
+  ]
+}
