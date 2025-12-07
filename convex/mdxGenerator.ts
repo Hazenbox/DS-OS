@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { getTenantContext } from "./tenantMiddleware";
-import { IRS, IRT, IML } from "./types/ir";
+import { IRS, IRT, IML } from "../src/types/ir";
 
 /**
  * MDX Documentation Generator

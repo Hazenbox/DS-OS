@@ -29,6 +29,7 @@ import type * as mdxGenerator from "../mdxGenerator.js";
 import type * as migrations_clearAllData from "../migrations/clearAllData.js";
 import type * as migrations_fixOrphanedRecords from "../migrations/fixOrphanedRecords.js";
 import type * as migrations_tenantMigration from "../migrations/tenantMigration.js";
+import type * as nodeRenderer from "../nodeRenderer.js";
 import type * as projectMembers from "../projectMembers.js";
 import type * as projects from "../projects.js";
 import type * as rateLimit from "../rateLimit.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/clearAllData": typeof migrations_clearAllData;
   "migrations/fixOrphanedRecords": typeof migrations_fixOrphanedRecords;
   "migrations/tenantMigration": typeof migrations_tenantMigration;
+  nodeRenderer: typeof nodeRenderer;
   projectMembers: typeof projectMembers;
   projects: typeof projects;
   rateLimit: typeof rateLimit;

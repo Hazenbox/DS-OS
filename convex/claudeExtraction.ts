@@ -8,6 +8,7 @@ import { extractIRT } from "./irtExtraction";
 import { classifyComponent } from "./componentIntelligence";
 import { extractIML } from "./imlExtraction";
 import { generateComponentCode } from "./codeGenerator";
+import { normalizeTokenName, matchFigmaVarsToTokens, TokenMatch } from "./tokenCompiler";
 import { IRS, IRT, IML } from "../src/types/ir";
 
 // ============================================================================
@@ -63,10 +64,19 @@ interface ExtractedComponent {
     css: string;
   }>;
   extractedProperties: Record<string, any>;
-  usedVariables: Array<{ name: string; value: string; type?: string }>;
+  usedVariables: Array<{ name: string; value: string; type?: string; cssVar?: string }>;
+  tokenMatches?: TokenMatch[]; // Figma vars matched to project tokens
   irs?: IRS; // Structure IR
   irt?: IRT; // Token IR
   iml?: IML; // Interaction Model IR
+}
+
+// Project token from database
+interface ProjectToken {
+  _id: any;
+  name: string;
+  value: string;
+  type: string;
 }
 
 // ============================================================================
@@ -524,11 +534,41 @@ export const extractAndBuildComponent = action({
     const iml = extractIML(irs, componentIntelligence);
     console.log(`Classified as: ${componentIntelligence.category} (confidence: ${componentIntelligence.confidence}), IML: ${iml.states.length} states, ${iml.keyboard.length} keyboard mappings`);
     
+    // Get project tokens for matching
+    const projectTokens = await ctx.runQuery(api.tokens.list, {
+      projectId: args.projectId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
+    // Convert Figma variables to array format for matching
+    const figmaVarsArray = Object.entries(variables).map(([id, varData]: [string, any]) => ({
+      id,
+      name: varData.name || '',
+      value: formatVariableValue(Object.values(varData.valuesByMode || {})[0], varData.resolvedType || ''),
+      type: varData.resolvedType || '',
+    }));
+    
+    // Match Figma variables to project tokens
+    const tokenMatches = matchFigmaVarsToTokens(
+      figmaVarsArray,
+      (projectTokens || []).map(t => ({
+        name: t.name,
+        value: t.value,
+        type: t.type,
+      }))
+    );
+    
+    console.log(`Matched ${tokenMatches.filter(t => t.matchedToken).length}/${tokenMatches.length} Figma variables to project tokens`);
+    
     // Legacy extraction (for backward compatibility)
     const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
     const extractedProps = extractNodeProperties(nodeData);
     const variants = extractVariants(nodeData);
-    const usedVariables = findBoundVariables(nodeData, variables);
+    const usedVariables = findBoundVariables(nodeData, variables).map(v => ({
+      ...v,
+      cssVar: tokenMatches.find(tm => tm.figmaVarName === v.name)?.matchedToken?.cssVar,
+    }));
     
     console.log(`Extracted: ${componentName}, ${variants.length} variants, ${usedVariables.length} variables`);
     
@@ -604,6 +644,7 @@ export const extractAndBuildComponent = action({
       })),
       extractedProperties: extractedProps,
       usedVariables,
+      tokenMatches, // Include token matches
       irs, // Include Structure IR
       irt, // Include Token IR
       iml, // Include Interaction Model IR

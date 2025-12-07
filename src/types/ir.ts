@@ -123,6 +123,11 @@ export interface IRSNode {
   children?: IRSNode[];
   slotName?: string; // If this node is a slot (e.g., 'label', 'icon', 'content')
   zIndex?: number;
+  // Vector graphics
+  vectorPaths?: Array<{ data: string; windingRule?: string }>;
+  // Text on path
+  textPath?: { data: string };
+  characters?: string; // Text content for TEXT nodes
 }
 
 export interface VariantProperty {

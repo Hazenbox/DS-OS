@@ -35,6 +35,11 @@ interface FigmaNode {
   boundVariables?: Record<string, any>;
   componentPropertyDefinitions?: Record<string, any>;
   variantProperties?: Record<string, string>;
+  // Vector graphics
+  vectorPaths?: Array<{ data: string; windingRule?: string }>;
+  // Text on path
+  textPath?: { data: string };
+  textStyleRange?: Array<{ path?: { data: string } }>;
 }
 
 /**
@@ -100,10 +105,13 @@ function extractNodeTree(node: FigmaNode, parentZIndex: number = 0): IRSNode[] {
     } : undefined,
     blendMode: node.blendMode || undefined,
     opacity: node.opacity,
-    blendMode: node.blendMode,
     cornerRadius: node.cornerRadius,
     rectangleCornerRadii: node.rectangleCornerRadii,
     slotName: inferSlotName(node),
+    // Store vector paths and text path data for SVG generation
+    ...(node.vectorPaths ? { vectorPaths: node.vectorPaths } : {}),
+    ...(node.textPath ? { textPath: node.textPath } : {}),
+    ...(node.characters ? { characters: node.characters } : {}),
     zIndex: parentZIndex,
   };
 

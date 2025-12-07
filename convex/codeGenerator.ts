@@ -3,6 +3,7 @@
 import { IRS, IRT, IML } from "../src/types/ir";
 import { gradientToCSS, handleNestedGradient } from "./gradientUtils";
 import { generateBlendModeCSS, requiresIsolation } from "./blendModeUtils";
+import { renderIRSTree } from "./nodeRenderer";
 
 // ============================================================================
 // CODE GENERATOR - Deterministic Template Engine
@@ -387,7 +388,14 @@ function generateGenericComponent(
   code += `      className={componentClassName}\n`;
   code += `      ${ariaAttrs}\n`;
   code += `    >\n`;
-  code += `      {children}\n`;
+  
+  // Render IRS tree (handles vector graphics, text on path, and regular nodes)
+  if (irs.tree && irs.tree.length > 0) {
+    code += renderIRSTree(irs.tree, componentName, 6);
+  } else {
+    code += `      {children}\n`;
+  }
+  
   code += `    </div>\n`;
   code += `  );\n`;
   
