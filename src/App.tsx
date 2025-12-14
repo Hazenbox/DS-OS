@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { TokenManager } from './components/TokenManager';
 import { ComponentBuilder } from './components/ComponentBuilder';
+import { McpBuilder } from './components/McpBuilder';
 import { ReleaseManager } from './components/ReleaseManager';
 import { Settings } from './components/Settings';
 import { ProjectManagement } from './components/ProjectManagement';
@@ -33,6 +34,7 @@ const pathToView: Record<string, ViewState> = {
   '/overview': 'dashboard',
   '/tokens': 'tokens',
   '/builder': 'builder',
+  '/mcp-builder': 'mcpBuilder',
   '/releases': 'releases',
   '/settings': 'settings',
   '/documentation': 'documentation',
@@ -45,6 +47,7 @@ const viewToPath: Record<ViewState, string> = {
   'dashboard': '/overview',
   'tokens': '/tokens',
   'builder': '/builder',
+  'mcpBuilder': '/mcp-builder',
   'releases': '/releases',
   'settings': '/settings',
   'documentation': '/documentation',
@@ -156,6 +159,8 @@ const AppContent: React.FC<{
         return <TokenManager />;
       case 'builder':
         return <ComponentBuilder />;
+      case 'mcpBuilder':
+        return <McpBuilder />;
       case 'releases':
         return <ReleaseManager />;
       case 'settings':

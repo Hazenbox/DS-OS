@@ -284,10 +284,14 @@ function findBoundVariables(
       const varId = (binding as any)?.id;
       if (varId && variables[varId]) {
         const variable = variables[varId];
-        const value = Object.values(variable.valuesByMode)[0];
+        
+        // Resolve aliases for this variable
+        const resolvedValues = resolveVariableValuesForMatching(variable, variables);
+        const resolvedValue = Object.values(resolvedValues)[0];
+        
         usedVars.push({
           name: variable.name,
-          value: formatVariableValue(value, variable.resolvedType),
+          value: formatVariableValue(resolvedValue, variable.resolvedType),
           type: variable.resolvedType.toLowerCase(),
         });
       }
@@ -304,8 +308,65 @@ function findBoundVariables(
   return usedVars;
 }
 
+/**
+ * Resolve variable alias to final value (helper for matching)
+ */
+function resolveVariableValuesForMatching(
+  variable: any,
+  allVariables: Record<string, any>,
+  visited: Set<string> = new Set(),
+  maxDepth: number = 10
+): Record<string, any> {
+  const resolved: Record<string, any> = {};
+  
+  for (const [modeId, value] of Object.entries(variable.valuesByMode || {})) {
+    // Check if value is an alias
+    if (value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS' && value.id) {
+      const aliasId = value.id;
+      
+      // Prevent infinite loops
+      if (visited.has(aliasId) || visited.size >= maxDepth) {
+        console.warn(`[ALIAS] Circular reference or max depth reached for variable ${aliasId}`);
+        resolved[modeId] = value; // Keep unresolved alias
+        continue;
+      }
+      
+      visited.add(aliasId);
+      
+      // Find the referenced variable
+      const referencedVar = allVariables[aliasId];
+      if (!referencedVar) {
+        console.warn(`[ALIAS] Referenced variable ${aliasId} not found`);
+        resolved[modeId] = value;
+        continue;
+      }
+      
+      // Get the value for the same mode, or first mode if mode doesn't exist
+      const modeValue = referencedVar.valuesByMode?.[modeId] || Object.values(referencedVar.valuesByMode || {})[0];
+      
+      // Recursively resolve if it's also an alias
+      if (modeValue && typeof modeValue === 'object' && modeValue.type === 'VARIABLE_ALIAS') {
+        resolved[modeId] = resolveVariableValuesForMatching(referencedVar, allVariables, visited, maxDepth)[modeId] || modeValue;
+      } else {
+        resolved[modeId] = modeValue;
+      }
+    } else {
+      // Direct value
+      resolved[modeId] = value;
+    }
+  }
+  
+  return resolved;
+}
+
 function formatVariableValue(value: any, type: string): string {
-  if (type === 'COLOR' && typeof value === 'object') {
+  // Handle resolved alias values
+  if (value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS') {
+    // This shouldn't happen if aliases are resolved, but handle it gracefully
+    return String(value);
+  }
+  
+  if (type === 'COLOR' && typeof value === 'object' && value.r !== undefined) {
     const { r, g, b, a } = value;
     return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a ?? 1})`;
   }
@@ -443,6 +504,275 @@ Return ONLY valid JSON with this structure (no markdown, no explanation):
 // MAIN EXTRACTION ACTION
 // ============================================================================
 
+// ============================================================================
+// MCP-BASED EXTRACTION ACTION
+// ============================================================================
+
+/**
+ * Extract and build component using Figma MCP data
+ * This action accepts pre-extracted data from Figma MCP tools
+ */
+export const extractAndBuildComponentFromMCP = action({
+  args: {
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+    figmaUrl: v.string(),
+    mcpDesignContext: v.any(), // Design context from Figma MCP
+    mcpVariables: v.optional(v.any()), // Variables from Figma MCP
+    progressId: v.optional(v.id("extractionProgress")),
+  },
+  handler: async (ctx, args): Promise<ExtractedComponent> => {
+    // Helper to update progress
+    const updateProgress = async (stepId: string, status: "in_progress" | "completed" | "failed", details?: string) => {
+      if (args.progressId) {
+        await ctx.runMutation(internal.extractionProgress.updateStep, {
+          progressId: args.progressId,
+          stepId,
+          status,
+          details,
+        });
+      }
+    };
+
+    try {
+      // Step 1: Validate
+      await updateProgress("validate", "in_progress");
+      await ctx.runQuery(api.tenants.get, {
+        tenantId: args.tenantId,
+        userId: args.userId,
+      });
+
+      const project = await ctx.runQuery(api.projects.get, {
+        id: args.projectId,
+        tenantId: args.tenantId,
+        userId: args.userId,
+      });
+
+      if (!project) {
+        await updateProgress("validate", "failed", "Project not found");
+        throw new Error('Project not found or access denied');
+      }
+
+      const urlMatch = args.figmaUrl.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
+      if (!urlMatch) {
+        await updateProgress("validate", "failed", "Invalid Figma URL");
+        throw new Error('Invalid Figma URL');
+      }
+      const fileKey = urlMatch[2];
+      await updateProgress("validate", "completed");
+
+      // Step 2: Process MCP data
+      await updateProgress("fetch", "in_progress");
+      console.log(`Processing MCP design context for: ${fileKey}`);
+
+      // Extract node data from MCP design context
+      // MCP design context structure may vary, so we handle multiple formats
+      let nodeData: FigmaNode;
+      if (args.mcpDesignContext.document) {
+        nodeData = args.mcpDesignContext.document;
+      } else if (args.mcpDesignContext.node) {
+        nodeData = args.mcpDesignContext.node;
+      } else if (args.mcpDesignContext.id) {
+        nodeData = args.mcpDesignContext as FigmaNode;
+      } else {
+        throw new Error('Invalid MCP design context format');
+      }
+
+      if (!nodeData) {
+        await updateProgress("fetch", "failed", "Invalid MCP data");
+        throw new Error('Could not extract node data from MCP design context');
+      }
+
+      await updateProgress("fetch", "completed", `Found component: ${nodeData.name}`);
+
+      // Process variables from MCP
+      const variables = args.mcpVariables?.meta?.variables || args.mcpVariables?.variables || {};
+      const variableCollections = args.mcpVariables?.meta?.variableCollections || args.mcpVariables?.variableCollections || {};
+
+      // Continue with extraction pipeline (same as REST API version)
+      return await processExtractedData(
+        ctx,
+        nodeData,
+        variables,
+        variableCollections,
+        args.figmaUrl,
+        fileKey,
+        args.projectId,
+        args.tenantId,
+        args.userId,
+        updateProgress
+      );
+    } catch (error) {
+      if (args.progressId) {
+        await ctx.runMutation(internal.extractionProgress.updateStatus, {
+          progressId: args.progressId,
+          status: "failed",
+          currentStep: "Extraction failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+      throw error;
+    }
+  },
+});
+
+// ============================================================================
+// SHARED EXTRACTION PROCESSING
+// ============================================================================
+
+async function processExtractedData(
+  ctx: any,
+  nodeData: FigmaNode,
+  variables: Record<string, any>,
+  variableCollections: Record<string, any>,
+  figmaUrl: string,
+  fileKey: string,
+  projectId: any,
+  tenantId: any,
+  userId: any,
+  updateProgress: (stepId: string, status: "in_progress" | "completed" | "failed", details?: string) => Promise<void>
+): Promise<ExtractedComponent> {
+  // Step 3: Extract structure
+  await updateProgress("extract_structure", "in_progress");
+  const irs = extractIRS(nodeData, figmaUrl, fileKey);
+  await updateProgress("extract_structure", "completed", `${irs.tree.length} nodes, ${irs.variants.length} variants`);
+
+  // Step 4: Extract typography
+  await updateProgress("extract_typography", "in_progress");
+  const typographyNodes = irs.tree.filter(n => n.type === 'TEXT' || n.typography);
+  await updateProgress("extract_typography", "completed", `${typographyNodes.length} text nodes`);
+
+  // Step 5: Extract colors
+  await updateProgress("extract_colors", "in_progress");
+  const colorNodes = irs.tree.filter(n => n.fills && n.fills.length > 0);
+  await updateProgress("extract_colors", "completed", `${colorNodes.length} nodes with fills`);
+
+  // Step 6: Extract layout
+  await updateProgress("extract_layout", "in_progress");
+  const layoutNodes = irs.tree.filter(n => n.layout);
+  await updateProgress("extract_layout", "completed", `${layoutNodes.length} nodes with layout`);
+
+  // Step 7: Extract effects
+  await updateProgress("extract_effects", "in_progress");
+  const effectNodes = irs.tree.filter(n => n.effects && n.effects.length > 0);
+  await updateProgress("extract_effects", "completed", `${effectNodes.length} nodes with effects`);
+
+  // Step 8: Extract variants
+  await updateProgress("extract_variants", "in_progress");
+  await updateProgress("extract_variants", "completed", `${irs.variants.length} variants`);
+
+  // Step 9: Extract tokens
+  await updateProgress("extract_tokens", "in_progress");
+  const allNodes = [nodeData, ...(nodeData.children || [])];
+  const irt = extractIRT(variables, variableCollections, allNodes);
+  await updateProgress("extract_tokens", "completed", `${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
+
+  // Step 10: Classify
+  await updateProgress("classify", "in_progress");
+  const componentIntelligence = classifyComponent(irs);
+  const iml = extractIML(irs, componentIntelligence);
+  await updateProgress("classify", "completed", `${componentIntelligence.category} (${Math.round(componentIntelligence.confidence * 100)}% confidence)`);
+
+  // Step 11: Get project tokens
+  const projectTokens = await ctx.runQuery(api.tokens.list, {
+    projectId,
+    tenantId,
+    userId,
+  });
+
+  // Resolve aliases before creating the array
+  const resolvedVariables: Record<string, any> = {};
+  for (const [id, varData] of Object.entries(variables)) {
+    const resolvedValues = resolveVariableValuesForMatching(varData, variables);
+    resolvedVariables[id] = {
+      ...varData,
+      valuesByMode: resolvedValues,
+    };
+  }
+  
+  const figmaVarsArray = Object.entries(resolvedVariables).map(([id, varData]: [string, any]) => ({
+    id,
+    name: varData.name || '',
+    value: formatVariableValue(Object.values(varData.valuesByMode || {})[0], varData.resolvedType || ''),
+    type: varData.resolvedType || '',
+  }));
+
+  const tokenMatches = matchFigmaVarsToTokens(
+    figmaVarsArray,
+    (projectTokens || []).map((t: { name: string; value: string; type: string }) => ({
+      name: t.name,
+      value: t.value,
+      type: t.type,
+    }))
+  );
+
+  const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
+  const extractedProps = extractNodeProperties(nodeData);
+  const variants = extractVariants(nodeData);
+  const usedVariables = findBoundVariables(nodeData, variables).map(v => ({
+    ...v,
+    cssVar: tokenMatches.find(tm => tm.figmaVarName === v.name)?.matchedToken?.cssVar,
+  }));
+
+  // Step 13: Generate types
+  await updateProgress("generate_types", "in_progress");
+  await updateProgress("generate_types", "completed");
+
+  // Step 14: Generate component
+  await updateProgress("generate_component", "in_progress");
+  let generatedCode;
+  try {
+    generatedCode = generateComponentCode(componentName, irs, irt, iml);
+    await updateProgress("generate_component", "completed", `${generatedCode.component.length} chars`);
+  } catch (error) {
+    await updateProgress("generate_component", "failed", error instanceof Error ? error.message : "Generation failed");
+    throw error;
+  }
+
+  // Step 15: Generate styles
+  await updateProgress("generate_styles", "in_progress");
+  await updateProgress("generate_styles", "completed", `${generatedCode.styles.length} chars`);
+
+  const code = generatedCode.component;
+  const css = generatedCode.styles;
+
+  // Step 16: Finalize
+  await updateProgress("finalize", "in_progress");
+  const variantCss = variants.slice(0, 10).map(v => {
+    const variantClass = Object.values(v.properties).join('-').toLowerCase().replace(/\s+/g, '-');
+    return `.${componentName.toLowerCase()}--${variantClass} { /* variant styles */ }`;
+  }).join('\n');
+
+  await updateProgress("finalize", "completed");
+
+  // Generate Storybook story
+  const storybook = generatedCode.storybook || '';
+
+  return {
+    name: componentName,
+    description: `Extracted from Figma: ${nodeData.name}`,
+    code,
+    css: css + '\n\n' + variantCss,
+    storybook,
+    variants: variants.slice(0, 20).map(v => ({
+      name: Object.values(v.properties).join(' / '),
+      properties: v.properties,
+      css: '',
+    })),
+    extractedProperties: extractedProps,
+    usedVariables,
+    tokenMatches,
+    irs,
+    irt,
+    iml,
+  };
+}
+
+// ============================================================================
+// MAIN EXTRACTION ACTION (REST API)
+// ============================================================================
+
 export const extractAndBuildComponent = action({
   args: {
     projectId: v.id("projects"),
@@ -450,6 +780,7 @@ export const extractAndBuildComponent = action({
     userId: v.id("users"),
     figmaUrl: v.string(),
     progressId: v.optional(v.id("extractionProgress")),
+    useMCP: v.optional(v.boolean()), // Option to use MCP if available
   },
   handler: async (ctx, args): Promise<ExtractedComponent> => {
     // Helper to update progress
@@ -498,6 +829,10 @@ export const extractAndBuildComponent = action({
         throw new Error('No node ID found in URL. Please select a specific component.');
       }
       
+      // Note: MCP tools cannot be called from server-side code
+      // If useMCP is true, the client should call extractAndBuildComponentFromMCP instead
+      // This action will use REST API as fallback
+      
       const figmaPat = await ctx.runQuery(api.settings.get, { 
         tenantId: args.tenantId,
         userId: args.userId, 
@@ -540,130 +875,19 @@ export const extractAndBuildComponent = action({
       const variables = variablesResponse.meta?.variables || {};
       const variableCollections = variablesResponse.meta?.variableCollections || {};
       
-      // Step 3: Extract structure
-      await updateProgress("extract_structure", "in_progress");
-      const irs = extractIRS(nodeData, args.figmaUrl, fileKey);
-      await updateProgress("extract_structure", "completed", `${irs.tree.length} nodes, ${irs.variants.length} variants`);
-      
-      // Step 4: Extract typography
-      await updateProgress("extract_typography", "in_progress");
-      const typographyNodes = irs.tree.filter(n => n.type === 'TEXT' || n.typography);
-      await updateProgress("extract_typography", "completed", `${typographyNodes.length} text nodes`);
-      
-      // Step 5: Extract colors
-      await updateProgress("extract_colors", "in_progress");
-      const colorNodes = irs.tree.filter(n => n.fills && n.fills.length > 0);
-      await updateProgress("extract_colors", "completed", `${colorNodes.length} nodes with fills`);
-      
-      // Step 6: Extract layout
-      await updateProgress("extract_layout", "in_progress");
-      const layoutNodes = irs.tree.filter(n => n.layout);
-      await updateProgress("extract_layout", "completed", `${layoutNodes.length} nodes with layout`);
-      
-      // Step 7: Extract effects
-      await updateProgress("extract_effects", "in_progress");
-      const effectNodes = irs.tree.filter(n => n.effects && n.effects.length > 0);
-      await updateProgress("extract_effects", "completed", `${effectNodes.length} nodes with effects`);
-      
-      // Step 8: Extract variants
-      await updateProgress("extract_variants", "in_progress");
-      await updateProgress("extract_variants", "completed", `${irs.variants.length} variants`);
-      
-      // Step 9: Extract tokens
-      await updateProgress("extract_tokens", "in_progress");
-      const allNodes = [nodeData, ...(nodeData.children || [])];
-      const irt = extractIRT(variables, variableCollections, allNodes);
-      await updateProgress("extract_tokens", "completed", `${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
-      
-      // Step 10: Classify
-      await updateProgress("classify", "in_progress");
-      const componentIntelligence = classifyComponent(irs);
-      const iml = extractIML(irs, componentIntelligence);
-      await updateProgress("classify", "completed", `${componentIntelligence.category} (${Math.round(componentIntelligence.confidence * 100)}% confidence)`);
-      
-      // Step 11: Get project tokens
-      const projectTokens = await ctx.runQuery(api.tokens.list, {
-        projectId: args.projectId,
-        tenantId: args.tenantId,
-        userId: args.userId,
-      });
-      
-      const figmaVarsArray = Object.entries(variables).map(([id, varData]: [string, any]) => ({
-        id,
-        name: varData.name || '',
-        value: formatVariableValue(Object.values(varData.valuesByMode || {})[0], varData.resolvedType || ''),
-        type: varData.resolvedType || '',
-      }));
-      
-      const tokenMatches = matchFigmaVarsToTokens(
-        figmaVarsArray,
-        (projectTokens || []).map((t: { name: string; value: string; type: string }) => ({
-          name: t.name,
-          value: t.value,
-          type: t.type,
-        }))
+      // Use shared processing function
+      return await processExtractedData(
+        ctx,
+        nodeData,
+        variables,
+        variableCollections,
+        args.figmaUrl,
+        fileKey,
+        args.projectId,
+        args.tenantId,
+        args.userId,
+        updateProgress
       );
-      
-      const componentName = nodeData.name.replace(/[^a-zA-Z0-9]/g, '');
-      const extractedProps = extractNodeProperties(nodeData);
-      const variants = extractVariants(nodeData);
-      const usedVariables = findBoundVariables(nodeData, variables).map(v => ({
-        ...v,
-        cssVar: tokenMatches.find(tm => tm.figmaVarName === v.name)?.matchedToken?.cssVar,
-      }));
-      
-      // Step 13: Generate types
-      await updateProgress("generate_types", "in_progress");
-      await updateProgress("generate_types", "completed");
-      
-      // Step 14: Generate component
-      await updateProgress("generate_component", "in_progress");
-      let generatedCode;
-      try {
-        generatedCode = generateComponentCode(componentName, irs, irt, iml);
-        await updateProgress("generate_component", "completed", `${generatedCode.component.length} chars`);
-      } catch (error) {
-        await updateProgress("generate_component", "failed", error instanceof Error ? error.message : "Generation failed");
-        throw error;
-      }
-      
-      // Step 15: Generate styles
-      await updateProgress("generate_styles", "in_progress");
-      await updateProgress("generate_styles", "completed", `${generatedCode.styles.length} chars`);
-      
-      const code = generatedCode.component;
-      const css = generatedCode.styles;
-      
-      // Step 16: Finalize
-      await updateProgress("finalize", "in_progress");
-      const variantCss = variants.slice(0, 10).map(v => {
-        const variantClass = Object.values(v.properties).join('-').toLowerCase().replace(/\s+/g, '-');
-        return `.${componentName.toLowerCase()}--${variantClass} { /* variant styles */ }`;
-      }).join('\n');
-      
-      await updateProgress("finalize", "completed");
-      
-      // Generate Storybook story
-      const storybook = generatedCode.storybook || '';
-      
-      return {
-        name: componentName,
-        description: `Extracted from Figma: ${nodeData.name}`,
-        code,
-        css: css + '\n\n' + variantCss,
-        storybook, // Include Storybook story
-        variants: variants.slice(0, 20).map(v => ({
-          name: Object.values(v.properties).join(' / '),
-          properties: v.properties,
-          css: '',
-        })),
-        extractedProperties: extractedProps,
-        usedVariables,
-        tokenMatches,
-        irs,
-        irt,
-        iml,
-      };
     } catch (error) {
       if (args.progressId) {
         await ctx.runMutation(internal.extractionProgress.updateStatus, {

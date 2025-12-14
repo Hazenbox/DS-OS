@@ -63,10 +63,28 @@ export const captureComponentScreenshot = action({
       throw new Error("Component not found");
     }
     
+    // Extract CSS from docs if present (look for ```css blocks)
+    let css = '';
+    if (component.docs) {
+      const cssMatch = component.docs.match(/```css\n([\s\S]*?)```/);
+      if (cssMatch) {
+        css = cssMatch[1].trim();
+      }
+    }
+    
+    // Combine component code with CSS in a style tag
+    // The screenshot service will inject this CSS into the HTML
+    const componentCodeWithStyles = css 
+      ? `${component.code}\n\n// Injected CSS:\nconst style = document.createElement('style');\nstyle.textContent = ${JSON.stringify(css)};\ndocument.head.appendChild(style);`
+      : component.code;
+    
     // Get screenshot service URL from environment
     // In production, this should be set to the deployed Vercel function URL
+    // For local development, use localhost; for production, use the deployed URL
     const screenshotServiceUrl = process.env.SCREENSHOT_SERVICE_URL || 
-      'https://your-app.vercel.app/api/screenshot';
+      (process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}/api/screenshot`
+        : 'http://localhost:3000/api/screenshot');
     
     try {
       // Call Vercel serverless function for screenshot capture
@@ -76,7 +94,8 @@ export const captureComponentScreenshot = action({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          componentCode: component.code,
+          componentCode: componentCodeWithStyles,
+          css: css, // Also pass CSS separately for the service to inject
           viewport: args.viewport,
           waitFor: 500, // Wait 500ms for component to render
         }),
@@ -120,22 +139,94 @@ export const fetchFigmaReference = action({
     // Verify tenant access
     await getTenantContext(ctx, args.userId, args.tenantId);
     
-    // Extract Figma node ID from provided nodeId or component metadata
-    // TODO: Get component from components.ts query to extract figmaNodeId
-    const figmaNodeId = args.nodeId || "";
+    // Get component to find extraction progress
+    const component = await ctx.runQuery(api.components.get, {
+      id: args.componentId,
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
     
-    if (!figmaNodeId) {
-      throw new Error("Figma node ID not found");
+    if (!component) {
+      throw new Error("Component not found");
     }
     
-    // TODO: Implement actual Figma API call to fetch image
-    // This requires:
-    // - Getting Figma PAT from tenant settings
-    // - Calling Figma API: GET /v1/images/{file_key}?ids={node_id}&format=png
-    // - Downloading the image
-    // - Uploading to storage for comparison
+    // Get Figma URL from extraction progress
+    let figmaUrl: string | null = null;
+    if (component.progressId) {
+      const progress = await ctx.runQuery(api.extractionProgress.get, {
+        progressId: component.progressId,
+      });
+      if (progress) {
+        figmaUrl = progress.figmaUrl;
+      }
+    }
     
-    return `https://placeholder.figma/${figmaNodeId}`;
+    if (!figmaUrl) {
+      throw new Error("Figma URL not found for component. Please re-extract the component.");
+    }
+    
+    // Extract file key and node ID from Figma URL
+    const urlMatch = figmaUrl.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
+    if (!urlMatch) {
+      throw new Error("Invalid Figma URL format");
+    }
+    const fileKey = urlMatch[2];
+    
+    const nodeIdMatch = figmaUrl.match(/node-id=([^&]+)/);
+    const nodeId = args.nodeId || (nodeIdMatch ? decodeURIComponent(nodeIdMatch[1]).replace(/-/g, ':') : null);
+    
+    if (!nodeId) {
+      throw new Error("Figma node ID not found in URL");
+    }
+    
+    // Get Figma PAT from settings
+    const figmaPat = await ctx.runQuery(api.settings.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+      key: 'figma_pat',
+    });
+    
+    if (!figmaPat) {
+      throw new Error("Figma Personal Access Token not configured. Please add it in Settings.");
+    }
+    
+    try {
+      // Call Figma API to get image
+      // Format: GET /v1/images/{file_key}?ids={node_id}&format=png
+      const figmaApiUrl = `https://api.figma.com/v1/images/${fileKey}?ids=${encodeURIComponent(nodeId)}&format=png&scale=2`;
+      
+      const response = await fetch(figmaApiUrl, {
+        headers: {
+          'X-Figma-Token': figmaPat,
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Figma API error: ${response.status} ${error}`);
+      }
+      
+      const data = await response.json();
+      const imageUrl = data.images?.[nodeId];
+      
+      if (!imageUrl) {
+        throw new Error("Figma image URL not found in response");
+      }
+      
+      // Download the image and convert to base64 for comparison
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download Figma image: ${imageResponse.statusText}`);
+      }
+      
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const base64 = Buffer.from(imageBuffer).toString('base64');
+      
+      return `data:image/png;base64,${base64}`;
+    } catch (error) {
+      console.error('Figma reference fetch failed:', error);
+      throw new Error(`Failed to fetch Figma reference: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   },
 });
 
@@ -168,8 +259,11 @@ export const compareImages = action({
     const threshold = args.threshold || 0.1; // 10% difference threshold
     
     // Get image diff service URL from environment or use default
+    // For local development, use localhost; for production, use the deployed URL
     const imageDiffServiceUrl = process.env.IMAGE_DIFF_SERVICE_URL || 
-      'https://your-app.vercel.app/api/image-diff';
+      (process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}/api/image-diff`
+        : 'http://localhost:3000/api/image-diff');
     
     try {
       // Call Vercel serverless function for image comparison
@@ -250,6 +344,9 @@ export const runVisualDiffTest = action({
         image2Url: figmaImageUrl,
         threshold,
       });
+      
+      // Calculate accuracy percentage (100% - diff percentage)
+      const accuracyPercentage = Math.max(0, (1 - comparison.diffPercentage) * 100);
       
       return {
         componentId: args.componentId,

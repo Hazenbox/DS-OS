@@ -8,6 +8,21 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 1899,
         host: '0.0.0.0',
+        proxy: {
+          '/api/figma-mcp': {
+            target: 'http://127.0.0.1:3845',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/api\/figma-mcp/, '/mcp'),
+            configure: (proxy, _options) => {
+              proxy.on('error', (err, _req, _res) => {
+                console.log('Figma MCP proxy error', err);
+              });
+              proxy.on('proxyReq', (proxyReq, req, _res) => {
+                console.log('Proxying MCP request:', req.method, req.url);
+              });
+            },
+          },
+        },
       },
       // SPA fallback is enabled by default in Vite
       appType: 'spa',

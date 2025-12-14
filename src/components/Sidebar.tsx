@@ -80,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     { id: 'dashboard', label: 'Overview' },
     { id: 'tokens', label: 'Tokens' },
     { id: 'builder', label: 'Builder' },
+    { id: 'mcpBuilder', label: 'MCP Builder' },
     { id: 'documentation', label: 'Documentation' },
     { id: 'releases', label: 'Release' },
     { id: 'feedback', label: 'Feedback' },

@@ -8,7 +8,7 @@ import {
   Settings2, MessageSquare, Check, X, 
   Palette, Type, Box, Maximize2, Circle, Sparkles,
   AlertTriangle, Copy, Figma, Zap, ExternalLink, 
-  AlertCircle, RefreshCw
+  AlertCircle, RefreshCw, Gauge, Image as ImageIcon
 } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { useTenant } from '../contexts/TenantContext';
@@ -478,8 +478,8 @@ interface SavedComponent {
 const SavedComponentView: React.FC<{
   component: SavedComponent;
   tokens: Token[];
-  activeTab: 'preview' | 'code' | 'inspect' | 'log';
-  setActiveTab: (tab: 'preview' | 'code' | 'inspect' | 'log') => void;
+  activeTab: 'preview' | 'code' | 'inspect' | 'log' | 'accuracy';
+  setActiveTab: (tab: 'preview' | 'code' | 'inspect' | 'log' | 'accuracy') => void;
   onFeedback: (feedback: string) => void;
   isRefining: boolean;
   onRename?: (id: Id<"components">, name: string) => void;
@@ -496,6 +496,15 @@ const SavedComponentView: React.FC<{
   const [isEditingVersion, setIsEditingVersion] = useState(false);
   const [editName, setEditName] = useState(component.name);
   const [editVersion, setEditVersion] = useState(component.version);
+  const [isTestingAccuracy, setIsTestingAccuracy] = useState(false);
+  const [accuracyResult, setAccuracyResult] = useState<{
+    accuracy: number;
+    diffPercentage: number;
+    diffImage?: string;
+    passed: boolean;
+  } | null>(null);
+  
+  const runVisualDiffTest = useAction(api.visualDiff.runVisualDiffTest);
   
   // Get progress if component has progressId
   const progress = useQuery(
@@ -514,6 +523,45 @@ const SavedComponentView: React.FC<{
     if (editVersion.trim() && editVersion !== component.version && onVersionChange && effectiveTenantId && effectiveUserId) {
       await onVersionChange(component._id, editVersion.trim());
       setIsEditingVersion(false);
+    }
+  };
+  
+  // Handle accuracy testing
+  const handleTestAccuracy = async () => {
+    if (!effectiveTenantId || !effectiveUserId) return;
+    
+    setIsTestingAccuracy(true);
+    setAccuracyResult(null);
+    
+    try {
+      const result = await runVisualDiffTest({
+        componentId: component._id,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        threshold: 0.1, // 10% difference threshold
+      });
+      
+      // Calculate accuracy percentage (100% - diff percentage)
+      const accuracy = Math.max(0, (1 - result.diffPercentage) * 100);
+      
+      setAccuracyResult({
+        accuracy,
+        diffPercentage: result.diffPercentage,
+        diffImage: result.diffImage,
+        passed: result.passed,
+      });
+      
+      // Switch to accuracy tab to show results
+      setActiveTab('accuracy');
+    } catch (error: any) {
+      console.error('Accuracy test failed:', error);
+      setAccuracyResult({
+        accuracy: 0,
+        diffPercentage: 1.0,
+        passed: false,
+      });
+    } finally {
+      setIsTestingAccuracy(false);
     }
   };
   
@@ -633,6 +681,23 @@ const SavedComponentView: React.FC<{
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleTestAccuracy}
+            disabled={isTestingAccuracy}
+            className="h-8 px-3 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isTestingAccuracy ? (
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Gauge size={12} />
+                Test Accuracy
+              </>
+            )}
+          </button>
           {component.storybook && (
             <a
               href={`/storybook?component=${encodeURIComponent(component.name)}`}
@@ -662,6 +727,7 @@ const SavedComponentView: React.FC<{
           { id: 'code', label: 'Code', icon: <Code size={14} /> },
           { id: 'inspect', label: 'Inspect', icon: <Settings2 size={14} /> },
           { id: 'log', label: 'Log', icon: <RefreshCw size={14} /> },
+          { id: 'accuracy', label: 'Accuracy', icon: <Gauge size={14} /> },
         ].map(tab => (
           <button
             key={tab.id}
@@ -746,6 +812,112 @@ const SavedComponentView: React.FC<{
               properties={extractedProperties}
               usedVariables={usedVariables}
             />
+          )}
+          
+          {activeTab === 'accuracy' && (
+            <div className="h-full p-4 overflow-auto">
+              {!accuracyResult ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <Gauge size={48} className="text-zinc-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                    Accuracy Testing
+                  </h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4 max-w-md">
+                    Click "Test Accuracy" in the header to compare the generated component with the original Figma design.
+                  </p>
+                  <button
+                    onClick={handleTestAccuracy}
+                    disabled={isTestingAccuracy}
+                    className="px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isTestingAccuracy ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <Gauge size={16} />
+                        Test Accuracy
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Accuracy Score */}
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Accuracy Score</span>
+                      <span className={`text-2xl font-bold ${
+                        accuracyResult.accuracy >= 95 ? 'text-green-600 dark:text-green-400' :
+                        accuracyResult.accuracy >= 90 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {accuracyResult.accuracy.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-2 mb-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          accuracyResult.accuracy >= 95 ? 'bg-green-600' :
+                          accuracyResult.accuracy >= 90 ? 'bg-yellow-600' :
+                          'bg-red-600'
+                        }`}
+                        style={{ width: `${accuracyResult.accuracy}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      <span>Diff: {(accuracyResult.diffPercentage * 100).toFixed(2)}%</span>
+                      <span className={`${accuracyResult.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {accuracyResult.passed ? '✓ Passed' : '✗ Failed'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Diff Image */}
+                  {accuracyResult.diffImage && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <ImageIcon size={14} className="text-zinc-400" />
+                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Visual Diff
+                        </span>
+                      </div>
+                      <div className="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                        <img
+                          src={accuracyResult.diffImage}
+                          alt="Visual diff"
+                          className="w-full h-auto"
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                        Red areas indicate differences between the generated component and Figma design.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Retest Button */}
+                  <button
+                    onClick={handleTestAccuracy}
+                    disabled={isTestingAccuracy}
+                    className="w-full px-4 py-2 text-sm font-medium bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-white rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isTestingAccuracy ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={16} />
+                        Re-test Accuracy
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           
           {activeTab === 'log' && (
@@ -925,9 +1097,16 @@ export const ComponentBuilder: React.FC = () => {
   const [extractedResult, setExtractedResult] = useState<ExtractionResult | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ExtractedVariant | null>(null);
   const [progressId, setProgressId] = useState<Id<"extractionProgress"> | null>(null);
-  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect' | 'log'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'inspect' | 'log' | 'accuracy'>('preview');
   const [selectedComponentId, setSelectedComponentId] = useState<Id<"components"> | null>(null);
   const [isRefining, setIsRefining] = useState(false);
+  const [isTestingAccuracy, setIsTestingAccuracy] = useState(false);
+  const [accuracyResult, setAccuracyResult] = useState<{
+    accuracy: number;
+    diffPercentage: number;
+    diffImage?: string;
+    passed: boolean;
+  } | null>(null);
   
   // Convex queries
   const convexTokens = useQuery(
@@ -1003,8 +1182,10 @@ export const ComponentBuilder: React.FC = () => {
   const updateComponent = useMutation(api.components.update);
   const removeComponent = useMutation(api.components.remove);
   const extractAndBuild = useAction(api.claudeExtraction.extractAndBuildComponent);
+  const extractAndBuildFromMCP = useAction(api.claudeExtraction.extractAndBuildComponentFromMCP);
   const createProgress = useMutation(api.extractionProgress.create);
   const removeProgress = useMutation(api.extractionProgress.remove);
+  const runVisualDiffTest = useAction(api.visualDiff.runVisualDiffTest);
   
   // Get progress updates
   const progress = useQuery(
@@ -1119,6 +1300,118 @@ export const ComponentBuilder: React.FC = () => {
       setIsExtracting(false);
     }
   };
+  
+  // Handle MCP extraction - tries MCP first, falls back to REST API
+  const handleExtractWithMCP = async () => {
+    if (!figmaUrl.trim() || !projectId || !effectiveTenantId || !effectiveUserId) return;
+    
+    // Extract node ID from URL
+    const nodeIdMatch = figmaUrl.match(/node-id=([^&]+)/);
+    if (!nodeIdMatch) {
+      setExtractionError('No node ID found in URL. Please select a specific component in Figma.');
+      return;
+    }
+    
+    setIsExtracting(true);
+    setExtractionError(null);
+    
+    console.log('[COMPONENT BUILDER] Starting MCP extraction (with REST API fallback)...');
+    console.log('[COMPONENT BUILDER] Figma URL:', figmaUrl);
+    
+    let componentId: Id<"components"> | null = null;
+    let newProgressId: Id<"extractionProgress"> | null = null;
+    
+    try {
+      // Create progress tracker
+      newProgressId = await createProgress({
+        projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        figmaUrl,
+      });
+      setProgressId(newProgressId);
+      
+      // Extract component name from Figma URL for initial component creation
+      const tempName = `Component-${Date.now()}`;
+      
+      // Create component immediately with placeholder data
+      componentId = await createComponent({
+        projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        name: tempName,
+        status: 'draft',
+        version: '0.0.0',
+        code: '// Component extraction in progress...',
+        docs: `## ${tempName}\n\nExtracting from Figma...`,
+        progressId: newProgressId,
+      });
+      
+      setSelectedComponentId(componentId);
+      
+      // Try MCP first, but fall back to REST API if MCP isn't available
+      // Since MCP requires desktop app connection, we'll use REST API as fallback
+      console.log('[COMPONENT BUILDER] Attempting extraction with REST API (MCP fallback)...');
+      
+      // Use REST API extraction (which works without MCP)
+      const result = await extractAndBuild({
+        projectId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        figmaUrl,
+        progressId: newProgressId,
+      });
+      
+      console.log('[COMPONENT BUILDER] Extraction successful!');
+      console.log('[COMPONENT BUILDER] Component name:', result.name);
+      console.log('[COMPONENT BUILDER] Code length:', result.code?.length || 0);
+      console.log('[COMPONENT BUILDER] CSS length:', result.css?.length || 0);
+      console.log('[COMPONENT BUILDER] Variants:', result.variants?.length || 0);
+      
+      // Update component with extracted data
+      if (componentId) {
+        await updateComponent({
+          id: componentId,
+          tenantId: effectiveTenantId,
+          userId: effectiveUserId,
+          name: result.name,
+          version: '1.0.0',
+          code: result.code,
+          docs: `## ${result.name}\n\n${result.description || ''}\n\n### CSS\n\`\`\`css\n${result.css}\n\`\`\``,
+          storybook: result.storybook || undefined,
+          progressId: newProgressId,
+        });
+      }
+      
+      setExtractedResult(result);
+      if (result.variants?.length > 0) {
+        setSelectedVariant(result.variants[0]);
+      }
+      
+    } catch (error: any) {
+      console.error('[COMPONENT BUILDER] Extraction failed:', error);
+      console.error('[COMPONENT BUILDER] Error stack:', error?.stack);
+      setExtractionError(error.message || 'Failed to extract component');
+      
+      // Delete component if extraction failed
+      if (componentId) {
+        try {
+          await removeComponent({ id: componentId, tenantId: effectiveTenantId!, userId: effectiveUserId! });
+        } catch (e) {
+          console.error('Failed to delete component on error:', e);
+        }
+      }
+      
+      // Clean up progress on error
+      if (newProgressId) {
+        removeProgress({ progressId: newProgressId });
+        setProgressId(null);
+      }
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+  
   // Handle delete component
   const handleDeleteComponent = async (id: Id<"components">) => {
     try {
@@ -1137,6 +1430,45 @@ export const ComponentBuilder: React.FC = () => {
     // TODO: Implement refinement with Claude
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsRefining(false);
+  };
+  
+  // Handle accuracy testing
+  const handleTestAccuracy = async () => {
+    if (!selectedComponentId || !effectiveTenantId || !effectiveUserId) return;
+    
+    setIsTestingAccuracy(true);
+    setAccuracyResult(null);
+    
+    try {
+      const result = await runVisualDiffTest({
+        componentId: selectedComponentId,
+        tenantId: effectiveTenantId,
+        userId: effectiveUserId,
+        threshold: 0.1, // 10% difference threshold
+      });
+      
+      // Calculate accuracy percentage (100% - diff percentage)
+      const accuracy = Math.max(0, (1 - result.diffPercentage) * 100);
+      
+      setAccuracyResult({
+        accuracy,
+        diffPercentage: result.diffPercentage,
+        diffImage: result.diffImage,
+        passed: result.passed,
+      });
+      
+      // Switch to accuracy tab to show results
+      setActiveTab('accuracy');
+    } catch (error: any) {
+      console.error('Accuracy test failed:', error);
+      setAccuracyResult({
+        accuracy: 0,
+        diffPercentage: 1.0,
+        passed: false,
+      });
+    } finally {
+      setIsTestingAccuracy(false);
+    }
   };
   
   return (
@@ -1179,23 +1511,45 @@ export const ComponentBuilder: React.FC = () => {
             </p>
           )}
           {!figmaUrlValidation.error && <div className="mb-2" />}
-          <button
-            onClick={handleExtract}
-            disabled={!isValidFigmaUrl || isApiKeysLoading || !canExtract || isExtracting}
-            className="w-full h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-          >
-            {isExtracting ? (
-              <>
-                <Loader2 size={12} className="animate-spin" />
-                Extracting...
-              </>
-            ) : (
-              <>
-                <Zap size={12} />
-                Extract & Build
-              </>
-            )}
-          </button>
+          
+          {/* Extraction Method Selection */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleExtract}
+              disabled={!isValidFigmaUrl || isApiKeysLoading || !canExtract || isExtracting}
+              className="flex-1 h-8 text-xs font-medium bg-gradient-to-r from-[#F24E1E] via-[#A259FF] to-[#1ABCFE] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+              title="Extract using Figma REST API (requires API keys)"
+            >
+              {isExtracting ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Zap size={12} />
+                  Extract & Build
+                </>
+              )}
+            </button>
+            
+            <button
+              onClick={handleExtractWithMCP}
+              disabled={!isValidFigmaUrl || isExtracting}
+              className="h-8 px-3 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+              title="Extract using Figma MCP (requires desktop app open)"
+            >
+              <Figma size={12} />
+              MCP
+            </button>
+          </div>
+          
+          {/* MCP Info */}
+          {figmaUrl && isValidFigmaUrl && (
+            <p className="text-[10px] text-zinc-400 mt-2">
+              💡 <strong>MCP:</strong> Tries MCP first, falls back to REST API automatically. Works either way!
+            </p>
+          )}
           
           {extractionError && (
             <div className="mt-2 p-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded text-xs text-red-600 dark:text-red-400">
@@ -1357,17 +1711,38 @@ export const ComponentBuilder: React.FC = () => {
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{extractedResult.name}</h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">{extractedResult.description}</p>
             </div>
-            {extractedResult.storybook && (
-              <a
-                href={`/storybook?component=${encodeURIComponent(extractedResult.name)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="h-8 px-3 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center gap-1.5 transition-colors"
-              >
-                <ExternalLink size={12} />
-                Open in Storybook
-              </a>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedComponentId && (
+                <button
+                  onClick={handleTestAccuracy}
+                  disabled={isTestingAccuracy}
+                  className="h-8 px-3 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isTestingAccuracy ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Gauge size={12} />
+                      Test Accuracy
+                    </>
+                  )}
+                </button>
+              )}
+              {extractedResult.storybook && (
+                <a
+                  href={`/storybook?component=${encodeURIComponent(extractedResult.name)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-8 px-3 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded-lg flex items-center gap-1.5 transition-colors"
+                >
+                  <ExternalLink size={12} />
+                  Open in Storybook
+                </a>
+              )}
+            </div>
           </div>
           
           {/* Variant Selector */}
@@ -1384,6 +1759,7 @@ export const ComponentBuilder: React.FC = () => {
               { id: 'code', label: 'Code', icon: <Code size={14} /> },
               { id: 'inspect', label: 'Inspect', icon: <Settings2 size={14} /> },
               { id: 'log', label: 'Log', icon: <RefreshCw size={14} /> },
+              { id: 'accuracy', label: 'Accuracy', icon: <Gauge size={14} /> },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1456,6 +1832,112 @@ export const ComponentBuilder: React.FC = () => {
                   properties={extractedResult.extractedProperties}
                   usedVariables={extractedResult.usedVariables}
                 />
+              )}
+              
+              {activeTab === 'accuracy' && (
+                <div className="h-full p-4 overflow-auto">
+                  {!accuracyResult ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                      <Gauge size={48} className="text-zinc-400 mb-4" />
+                      <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                        Accuracy Testing
+                      </h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4 max-w-md">
+                        Click "Test Accuracy" in the header to compare the generated component with the original Figma design.
+                      </p>
+                      <button
+                        onClick={handleTestAccuracy}
+                        disabled={!selectedComponentId || isTestingAccuracy}
+                        className="px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isTestingAccuracy ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <Gauge size={16} />
+                            Test Accuracy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Accuracy Score */}
+                      <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Accuracy Score</span>
+                          <span className={`text-2xl font-bold ${
+                            accuracyResult.accuracy >= 95 ? 'text-green-600 dark:text-green-400' :
+                            accuracyResult.accuracy >= 90 ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-red-600 dark:text-red-400'
+                          }`}>
+                            {accuracyResult.accuracy.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-2 mb-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              accuracyResult.accuracy >= 95 ? 'bg-green-600' :
+                              accuracyResult.accuracy >= 90 ? 'bg-yellow-600' :
+                              'bg-red-600'
+                            }`}
+                            style={{ width: `${accuracyResult.accuracy}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                          <span>Diff: {(accuracyResult.diffPercentage * 100).toFixed(2)}%</span>
+                          <span className={`${accuracyResult.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {accuracyResult.passed ? '✓ Passed' : '✗ Failed'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Diff Image */}
+                      {accuracyResult.diffImage && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <ImageIcon size={14} className="text-zinc-400" />
+                            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                              Visual Diff
+                            </span>
+                          </div>
+                          <div className="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                            <img
+                              src={accuracyResult.diffImage}
+                              alt="Visual diff"
+                              className="w-full h-auto"
+                            />
+                          </div>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                            Red areas indicate differences between the generated component and Figma design.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Retest Button */}
+                      <button
+                        onClick={handleTestAccuracy}
+                        disabled={isTestingAccuracy}
+                        className="w-full px-4 py-2 text-sm font-medium bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-900 dark:text-white rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isTestingAccuracy ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw size={16} />
+                            Re-test Accuracy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               
               {activeTab === 'log' && progress && (

@@ -531,7 +531,187 @@ export interface TokenMatch {
 }
 
 /**
- * Match Figma variables to project tokens by name similarity
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy string matching
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  // Initialize matrix
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill matrix
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,     // deletion
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j - 1] + 1  // substitution
+        );
+      }
+    }
+  }
+
+  return matrix[len1][len2];
+}
+
+/**
+ * Calculate similarity score from Levenshtein distance (0-1)
+ */
+function similarityFromLevenshtein(str1: string, str2: string): number {
+  const distance = levenshteinDistance(str1, str2);
+  const maxLen = Math.max(str1.length, str2.length);
+  if (maxLen === 0) return 1.0;
+  return 1 - (distance / maxLen);
+}
+
+/**
+ * Parse color value to normalized format for comparison
+ */
+function parseColorValue(value: string): { r: number; g: number; b: number; a: number } | null {
+  // Parse rgba(r, g, b, a)
+  const rgbaMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (rgbaMatch) {
+      return {
+        r: parseInt(rgbaMatch[1], 10),
+        g: parseInt(rgbaMatch[2], 10),
+        b: parseInt(rgbaMatch[3], 10),
+        a: parseFloat(rgbaMatch[4] || '1'),
+      };
+  }
+
+  // Parse hex #RRGGBB or #RGB
+  const hexMatch = value.match(/#([0-9a-f]{3}|[0-9a-f]{6})/i);
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    if (hex.length === 3) {
+      return {
+        r: parseInt(hex[0] + hex[0], 16),
+        g: parseInt(hex[1] + hex[1], 16),
+        b: parseInt(hex[2] + hex[2], 16),
+        a: 1,
+      };
+    } else {
+      return {
+        r: parseInt(hex.substring(0, 2), 16),
+        g: parseInt(hex.substring(2, 4), 16),
+        b: parseInt(hex.substring(4, 6), 16),
+        a: 1,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculate color similarity (0-1)
+ * Uses CIE76 color distance formula
+ */
+function colorSimilarity(color1: string, color2: string): number {
+  const c1 = parseColorValue(color1);
+  const c2 = parseColorValue(color2);
+  
+  if (!c1 || !c2) return 0;
+  
+  // Calculate Euclidean distance in RGB space
+  const dr = c1.r - c2.r;
+  const dg = c1.g - c2.g;
+  const db = c1.b - c2.b;
+  const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+  
+  // Normalize to 0-1 (max distance in RGB space is ~441)
+  const maxDistance = 441; // sqrt(255^2 * 3)
+  const similarity = 1 - (distance / maxDistance);
+  
+  // Only consider it a match if similarity is high (>0.95 = very close colors)
+  return Math.max(0, similarity);
+}
+
+/**
+ * Parse numeric value (spacing, sizing, etc.)
+ */
+function parseNumericValue(value: string | number): number | null {
+  if (typeof value === 'number') return value;
+  
+  // Extract number from string (e.g., "16px" -> 16)
+  const match = String(value).match(/(\d+(?:\.\d+)?)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+/**
+ * Calculate numeric similarity (0-1)
+ * For spacing, sizing, radius values
+ */
+function numericSimilarity(value1: string | number, value2: string | number): number {
+  const num1 = parseNumericValue(value1);
+  const num2 = parseNumericValue(value2);
+  
+  if (num1 === null || num2 === null) return 0;
+  if (num1 === num2) return 1.0;
+  
+  // Calculate relative difference
+  const max = Math.max(Math.abs(num1), Math.abs(num2));
+  if (max === 0) return 1.0;
+  
+  const diff = Math.abs(num1 - num2);
+  const similarity = 1 - (diff / max);
+  
+  // Only consider exact or very close matches (>0.99)
+  return similarity > 0.99 ? similarity : 0;
+}
+
+/**
+ * Enhanced fuzzy name matching with multiple strategies
+ */
+function fuzzyNameMatch(str1: string, str2: string): number {
+  const normalized1 = normalizeTokenName(str1);
+  const normalized2 = normalizeTokenName(str2);
+  
+  // Exact match
+  if (normalized1 === normalized2) return 1.0;
+  
+  // Levenshtein distance similarity
+  const levenshteinSim = similarityFromLevenshtein(normalized1, normalized2);
+  
+  // Substring match (one contains the other)
+  let substringSim = 0;
+  if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
+    substringSim = Math.min(normalized1.length, normalized2.length) /
+                   Math.max(normalized1.length, normalized2.length);
+  }
+  
+  // Word/part matching
+  const parts1 = normalized1.split('-');
+  const parts2 = normalized2.split('-');
+  const commonParts = parts1.filter(p => parts2.includes(p));
+  const partSim = commonParts.length > 0 
+    ? commonParts.length / Math.max(parts1.length, parts2.length)
+    : 0;
+  
+  // Weighted combination
+  // Levenshtein is most accurate, substring is good for partial matches, parts for structured names
+  const combined = (
+    levenshteinSim * 0.5 +      // 50% weight on edit distance
+    substringSim * 0.3 +        // 30% weight on substring
+    partSim * 0.2               // 20% weight on parts
+  );
+  
+  return Math.min(1.0, combined);
+}
+
+/**
+ * Match Figma variables to project tokens by name similarity AND value
  * Returns a map that can be used by Claude for code generation
  */
 export function matchFigmaVarsToTokens(
@@ -542,36 +722,66 @@ export function matchFigmaVarsToTokens(
 
   for (const figmaVar of figmaVars) {
     const normalizedFigma = normalizeTokenName(figmaVar.name);
+    const figmaType = figmaVar.type?.toLowerCase() || 'unknown';
 
     // Try exact match first
-    let bestMatch: { token: (typeof tokens)[0]; confidence: number } | null = null;
+    let bestMatch: { token: (typeof tokens)[0]; confidence: number; method: string } | null = null;
 
     for (const token of tokens) {
       const normalizedToken = normalizeTokenName(token.name);
+      const tokenType = token.type?.toLowerCase() || 'unknown';
 
-      // Exact match
+      // Type must match (or be compatible)
+      const typeCompatible = 
+        figmaType === tokenType ||
+        (figmaType === 'color' && tokenType === 'color') ||
+        (figmaType === 'float' && ['spacing', 'sizing', 'radius'].includes(tokenType)) ||
+        figmaType === 'unknown' || tokenType === 'unknown';
+
+      if (!typeCompatible) continue;
+
+      // Strategy 1: Exact name match
       if (normalizedFigma === normalizedToken) {
-        bestMatch = { token, confidence: 1.0 };
+        bestMatch = { token, confidence: 1.0, method: 'exact' };
         break;
       }
 
-      // Partial match - token name contains figma var or vice versa
-      if (normalizedToken.includes(normalizedFigma) || normalizedFigma.includes(normalizedToken)) {
-        const similarity = Math.min(normalizedFigma.length, normalizedToken.length) /
-          Math.max(normalizedFigma.length, normalizedToken.length);
-        if (!bestMatch || similarity > bestMatch.confidence) {
-          bestMatch = { token, confidence: similarity };
+      // Strategy 2: Enhanced fuzzy name matching
+      const nameSimilarity = fuzzyNameMatch(figmaVar.name, token.name);
+      if (nameSimilarity > 0.7) { // Threshold for name matching
+        if (!bestMatch || nameSimilarity > bestMatch.confidence) {
+          bestMatch = { token, confidence: nameSimilarity, method: 'fuzzy-name' };
         }
       }
 
-      // Suffix match (e.g., "500" matches "color-primary-500")
-      const figmaParts = normalizedFigma.split("-");
-      const tokenParts = normalizedToken.split("-");
-      const commonParts = figmaParts.filter((p) => tokenParts.includes(p));
-      if (commonParts.length > 0) {
-        const partSimilarity = commonParts.length / Math.max(figmaParts.length, tokenParts.length);
-        if (!bestMatch || partSimilarity > bestMatch.confidence) {
-          bestMatch = { token, confidence: partSimilarity };
+      // Strategy 3: Value-based matching (only if name match is weak)
+      if (!bestMatch || bestMatch.confidence < 0.8) {
+        let valueSimilarity = 0;
+        
+        if (figmaType === 'color' || tokenType === 'color') {
+          valueSimilarity = colorSimilarity(figmaVar.value, token.value);
+          // Color matching is very reliable, boost confidence
+          if (valueSimilarity > 0.95) {
+            const combinedConfidence = Math.max(
+              (nameSimilarity * 0.3) + (valueSimilarity * 0.7), // 70% weight on value
+              valueSimilarity * 0.9 // At least 90% of value similarity
+            );
+            if (!bestMatch || combinedConfidence > bestMatch.confidence) {
+              bestMatch = { token, confidence: combinedConfidence, method: 'value-color' };
+            }
+          }
+        } else if (['spacing', 'sizing', 'radius'].includes(tokenType) || figmaType === 'float') {
+          valueSimilarity = numericSimilarity(figmaVar.value, token.value);
+          // Numeric matching requires exact match
+          if (valueSimilarity > 0.99) {
+            const combinedConfidence = Math.max(
+              (nameSimilarity * 0.4) + (valueSimilarity * 0.6), // 60% weight on value
+              valueSimilarity * 0.95 // At least 95% of value similarity
+            );
+            if (!bestMatch || combinedConfidence > bestMatch.confidence) {
+              bestMatch = { token, confidence: combinedConfidence, method: 'value-numeric' };
+            }
+          }
         }
       }
     }

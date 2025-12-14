@@ -19,6 +19,7 @@ import type * as components_ from "../components.js";
 import type * as extractionProgress from "../extractionProgress.js";
 import type * as figma from "../figma.js";
 import type * as figmaExtraction from "../figmaExtraction.js";
+import type * as figmaMcpExtraction from "../figmaMcpExtraction.js";
 import type * as fontFiles from "../fontFiles.js";
 import type * as github from "../github.js";
 import type * as gradientUtils from "../gradientUtils.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   extractionProgress: typeof extractionProgress;
   figma: typeof figma;
   figmaExtraction: typeof figmaExtraction;
+  figmaMcpExtraction: typeof figmaMcpExtraction;
   fontFiles: typeof fontFiles;
   github: typeof github;
   gradientUtils: typeof gradientUtils;

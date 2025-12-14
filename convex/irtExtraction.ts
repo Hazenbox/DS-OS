@@ -12,6 +12,7 @@ interface FigmaVariable {
   resolvedType: string;
   valuesByMode: Record<string, any>;
   variableCollectionId?: string;
+  // Alias reference structure: { type: 'VARIABLE_ALIAS', id: string }
 }
 
 interface FigmaVariableCollection {
@@ -28,7 +29,76 @@ interface FigmaNode {
 }
 
 /**
+ * Resolve Figma variable alias to final value
+ * Handles chains of aliases (A -> B -> C -> final value)
+ */
+function resolveAlias(
+  aliasValue: any,
+  variables: Record<string, FigmaVariable>,
+  visited: Set<string> = new Set(),
+  maxDepth: number = 10
+): any {
+  // Check if it's an alias
+  if (!aliasValue || typeof aliasValue !== 'object') {
+    return aliasValue;
+  }
+  
+  // Check for VARIABLE_ALIAS type
+  if (aliasValue.type === 'VARIABLE_ALIAS' && aliasValue.id) {
+    const aliasId = aliasValue.id;
+    
+    // Prevent infinite loops
+    if (visited.has(aliasId) || visited.size >= maxDepth) {
+      console.warn(`[ALIAS] Circular reference or max depth reached for variable ${aliasId}`);
+      return aliasValue; // Return unresolved alias
+    }
+    
+    visited.add(aliasId);
+    
+    // Find the referenced variable
+    const referencedVar = variables[aliasId];
+    if (!referencedVar) {
+      console.warn(`[ALIAS] Referenced variable ${aliasId} not found`);
+      return aliasValue;
+    }
+    
+    // Get the first mode value (we'll resolve all modes separately)
+    const firstModeValue = Object.values(referencedVar.valuesByMode)[0];
+    
+    // Recursively resolve if it's also an alias
+    return resolveAlias(firstModeValue, variables, visited, maxDepth);
+  }
+  
+  return aliasValue;
+}
+
+/**
+ * Resolve all mode values for a variable, handling aliases
+ */
+function resolveVariableValues(
+  variable: FigmaVariable,
+  variables: Record<string, FigmaVariable>
+): Record<string, any> {
+  const resolved: Record<string, any> = {};
+  
+  for (const [modeId, value] of Object.entries(variable.valuesByMode)) {
+    // Check if value is an alias
+    if (value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS') {
+      // Resolve the alias
+      const resolvedValue = resolveAlias(value, variables);
+      resolved[modeId] = resolvedValue;
+    } else {
+      // Direct value, use as-is
+      resolved[modeId] = value;
+    }
+  }
+  
+  return resolved;
+}
+
+/**
  * Extract IRT (Token IR) from Figma variables and bound variables in nodes
+ * Now with full alias resolution
  */
 export function extractIRT(
   variables: Record<string, FigmaVariable>,
@@ -39,14 +109,23 @@ export function extractIRT(
   const modeValues: Record<string, Record<string, string | number>> = {};
   const tokenUsage: Record<string, string[]> = {};
   
-  // Extract tokens from variables
+  // Extract tokens from variables with alias resolution
   for (const [varId, variable] of Object.entries(variables)) {
-    const token = extractTokenFromVariable(variable, varId);
+    // Resolve aliases for this variable
+    const resolvedValues = resolveVariableValues(variable, variables);
+    
+    // Create a temporary variable with resolved values for token extraction
+    const resolvedVariable: FigmaVariable = {
+      ...variable,
+      valuesByMode: resolvedValues,
+    };
+    
+    const token = extractTokenFromVariable(resolvedVariable, varId);
     if (token) {
       tokens.push(token);
       
-      // Extract mode values
-      for (const [modeId, value] of Object.entries(variable.valuesByMode)) {
+      // Extract mode values (now with resolved aliases)
+      for (const [modeId, value] of Object.entries(resolvedValues)) {
         if (!modeValues[modeId]) {
           modeValues[modeId] = {};
         }
@@ -156,16 +235,26 @@ function inferTokenType(resolvedType: string, name: string): SemanticToken['type
 
 /**
  * Format token value based on type
+ * Handles resolved alias values
  */
 function formatTokenValue(value: any, resolvedType: string): string | number {
-  if (resolvedType === 'COLOR' && typeof value === 'object') {
+  // Handle unresolved aliases (shouldn't happen after resolution, but handle gracefully)
+  if (value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS') {
+    console.warn('[TOKEN] Unresolved alias detected, using placeholder');
+    return 'unresolved-alias';
+  }
+  
+  if (resolvedType === 'COLOR' && typeof value === 'object' && value.r !== undefined) {
     const { r, g, b, a } = value;
     return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a ?? 1})`;
   }
   if (resolvedType === 'FLOAT') {
-    return value;
+    return typeof value === 'number' ? value : parseFloat(value) || 0;
   }
   if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
     return value;
   }
   return String(value);
