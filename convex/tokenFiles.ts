@@ -44,69 +44,96 @@ export const create = mutation({
     content: v.string(), // Raw JSON content
   },
   handler: async (ctx, args) => {
-    // Verify tenant access and require developer role
-    await getTenantContext(ctx, args.userId, args.tenantId);
-    await requireRole(ctx, args.tenantId, args.userId, "developer");
-    
-    // Verify project belongs to tenant
-    const project = await ctx.db.get(args.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-    verifyTenantResource(ctx, args.tenantId, project);
-    
-    // Parse JSON content server-side
-    let parsedTokens;
-    let tokenCount = 0;
-    
     try {
-      const json = JSON.parse(args.content);
-      parsedTokens = parseTokensFromJSON(json);
-      tokenCount = parsedTokens.length;
+      // Verify tenant access and require developer role
+      await getTenantContext(ctx, args.userId, args.tenantId);
+      await requireRole(ctx, args.tenantId, args.userId, "developer");
       
-      console.log(`[TOKEN FILES] Parsed ${tokenCount} tokens from ${args.originalName}`);
-    } catch (error) {
-      console.error(`[TOKEN FILES] Failed to parse JSON:`, error);
-      throw new Error(`Invalid JSON format: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    
-    // Get user email
-    const user = await ctx.db.get(args.userId);
-    const userEmail = user?.email || "unknown";
-    
-    // Create the file record
-    const fileId = await ctx.db.insert("tokenFiles", {
-      tenantId: args.tenantId,
-      projectId: args.projectId,
-      name: args.name,
-      originalName: args.originalName,
-      content: args.content,
-      tokenCount: tokenCount,
-      isActive: true, // New files are active by default
-      uploadedAt: Date.now(),
-      uploadedBy: userEmail,
-    });
-    
-    // Import tokens automatically (server-side)
-    if (parsedTokens.length > 0) {
-      // Import tokens immediately via internal mutation
-      await ctx.runMutation(internal.tokenFiles._importTokensFromFile, {
-        fileId,
+      // Verify project belongs to tenant
+      const project = await ctx.db.get(args.projectId);
+      if (!project) {
+        throw new Error("Project not found");
+      }
+      verifyTenantResource(ctx, args.tenantId, project);
+      
+      // Parse JSON content server-side
+      let parsedTokens;
+      let tokenCount = 0;
+      
+      try {
+        const json = JSON.parse(args.content);
+        parsedTokens = parseTokensFromJSON(json);
+        tokenCount = parsedTokens.length;
+        
+        console.log(`[TOKEN FILES] Parsed ${tokenCount} tokens from ${args.originalName}`);
+      } catch (error) {
+        console.error(`[TOKEN FILES] Failed to parse JSON:`, error);
+        throw new Error(`Invalid JSON format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      // Get user email
+      const user = await ctx.db.get(args.userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+      const userEmail = user.email || "unknown";
+      
+      // Create the file record
+      const fileId = await ctx.db.insert("tokenFiles", {
         tenantId: args.tenantId,
         projectId: args.projectId,
-        userId: args.userId,
-        tokens: parsedTokens.map(t => ({
-          name: t.name,
-          value: t.value,
-          valueByMode: t.valueByMode,
-          type: t.type,
-          description: t.description,
-          modes: t.modes,
-        })),
+        name: args.name,
+        originalName: args.originalName,
+        content: args.content,
+        tokenCount: tokenCount,
+        isActive: true, // New files are active by default
+        uploadedAt: Date.now(),
+        uploadedBy: userEmail,
       });
+      
+      // Import tokens automatically (server-side)
+      if (parsedTokens.length > 0) {
+        try {
+          // Import tokens immediately via internal mutation
+          await ctx.runMutation(internal.tokenFiles._importTokensFromFile, {
+            fileId,
+            tenantId: args.tenantId,
+            projectId: args.projectId,
+            userId: args.userId,
+            tokens: parsedTokens.map(t => ({
+              name: t.name,
+              value: t.value,
+              valueByMode: t.valueByMode,
+              type: t.type,
+              description: t.description,
+              modes: t.modes,
+            })),
+          });
+        } catch (importError) {
+          console.error(`[TOKEN FILES] Failed to import tokens:`, importError);
+          // Don't fail the file creation if import fails - file is already created
+          // But log the error for debugging
+          throw new Error(`File created but token import failed: ${importError instanceof Error ? importError.message : 'Unknown error'}`);
+        }
+      }
+      
+      return fileId;
+    } catch (error) {
+      // Provide more detailed error messages
+      console.error(`[TOKEN FILES] Error in create mutation:`, error);
+      if (error instanceof Error) {
+        // Re-throw with original message if it's already a descriptive error
+        if (error.message.includes("Access denied") || 
+            error.message.includes("not found") || 
+            error.message.includes("Invalid") ||
+            error.message.includes("does not belong")) {
+          throw error;
+        }
+        // Otherwise wrap in a more descriptive error
+        throw new Error(`Failed to create token file: ${error.message}`);
+      }
+      throw new Error(`Failed to create token file: Unknown error`);
     }
-    
-    return fileId;
   },
 });
 
@@ -136,23 +163,28 @@ export const _importTokensFromFile = internalMutation({
     })),
   },
   handler: async (ctx, args) => {
-    // Verify file exists
-    const file = await ctx.db.get(args.fileId);
-    if (!file) {
-      throw new Error("File not found");
+    try {
+      // Verify file exists
+      const file = await ctx.db.get(args.fileId);
+      if (!file) {
+        throw new Error("File not found");
+      }
+      
+      // Use bulkImport mutation via runMutation
+      await ctx.runMutation(api.tokens.bulkImport, {
+        projectId: args.projectId,
+        tenantId: args.tenantId,
+        userId: args.userId,
+        tokens: args.tokens,
+        sourceFileId: args.fileId,
+        clearExisting: false, // Don't clear existing tokens
+      });
+      
+      console.log(`[TOKEN FILES] Imported ${args.tokens.length} tokens from file ${args.fileId}`);
+    } catch (error) {
+      console.error(`[TOKEN FILES] Error in _importTokensFromFile:`, error);
+      throw new Error(`Failed to import tokens: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    // Use bulkImport mutation via runMutation
-    await ctx.runMutation(api.tokens.bulkImport, {
-      projectId: args.projectId,
-      tenantId: args.tenantId,
-      userId: args.userId,
-      tokens: args.tokens,
-      sourceFileId: args.fileId,
-      clearExisting: false, // Don't clear existing tokens
-    });
-    
-    console.log(`[TOKEN FILES] Imported ${args.tokens.length} tokens from file ${args.fileId}`);
   },
 });
 
