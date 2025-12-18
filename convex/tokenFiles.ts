@@ -94,21 +94,36 @@ export const create = mutation({
       // Import tokens automatically (server-side)
       if (parsedTokens.length > 0) {
         try {
-          // Import tokens immediately via internal mutation
-          await ctx.runMutation(internal.tokenFiles._importTokensFromFile, {
-            fileId,
-            tenantId: args.tenantId,
-            projectId: args.projectId,
-            userId: args.userId,
-            tokens: parsedTokens.map(t => ({
-              name: t.name,
-              value: t.value,
-              valueByMode: t.valueByMode,
-              type: t.type,
-              description: t.description,
-              modes: t.modes,
-            })),
-          });
+          // Batch tokens into chunks of 1000 (bulkImport limit)
+          const BATCH_SIZE = 1000;
+          const tokenBatches = [];
+          for (let i = 0; i < parsedTokens.length; i += BATCH_SIZE) {
+            tokenBatches.push(parsedTokens.slice(i, i + BATCH_SIZE));
+          }
+          
+          console.log(`[TOKEN FILES] Importing ${parsedTokens.length} tokens in ${tokenBatches.length} batches`);
+          
+          // Import each batch sequentially
+          for (let i = 0; i < tokenBatches.length; i++) {
+            const batch = tokenBatches[i];
+            await ctx.runMutation(internal.tokenFiles._importTokensFromFile, {
+              fileId,
+              tenantId: args.tenantId,
+              projectId: args.projectId,
+              userId: args.userId,
+              tokens: batch.map(t => ({
+                name: t.name,
+                value: t.value,
+                valueByMode: t.valueByMode,
+                type: t.type,
+                description: t.description,
+                modes: t.modes,
+              })),
+            });
+            console.log(`[TOKEN FILES] Imported batch ${i + 1}/${tokenBatches.length} (${batch.length} tokens)`);
+          }
+          
+          console.log(`[TOKEN FILES] Successfully imported all ${parsedTokens.length} tokens`);
         } catch (importError) {
           console.error(`[TOKEN FILES] Failed to import tokens:`, importError);
           // Don't fail the file creation if import fails - file is already created
