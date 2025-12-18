@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { TokenType, ConvexToken, convexTokenToLegacy } from '../types';
@@ -450,7 +450,7 @@ export const TokenManager: React.FC = () => {
     const bulkImport = useMutation(api.tokens.bulkImport);
     
     // File mutations
-    const createFile = useMutation(api.tokenFiles.create);
+    const createFile = useAction(api.tokenFiles.uploadAndCreate);
     const renameFile = useMutation(api.tokenFiles.rename);
     const toggleFileActive = useMutation(api.tokenFiles.toggleActive);
     const removeFile = useMutation(api.tokenFiles.remove);

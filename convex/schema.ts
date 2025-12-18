@@ -208,7 +208,8 @@ export default defineSchema({
     projectId: v.id("projects"),
     name: v.string(), // Display name (editable)
     originalName: v.string(), // Original filename
-    content: v.string(), // JSON content as string
+    content: v.string(), // JSON content as string (empty for large files stored externally)
+    storageUrl: v.optional(v.string()), // URL to file in blob storage (for large files)
     tokenCount: v.number(), // Number of tokens in the file
     isActive: v.boolean(), // Whether to use this file's tokens
     uploadedAt: v.number(),
