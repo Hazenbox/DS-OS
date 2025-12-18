@@ -464,10 +464,10 @@ Return ONLY valid JSON with this structure (no markdown, no explanation):
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': claudeApiKey,
-      'anthropic-version': '2023-06-01',
+      'anthropic-version': '2024-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 4096,
       messages: [
         {
@@ -958,6 +958,83 @@ export const getApiKeyStatus = action({
       hasFigmaPat: !!figmaPat,
       hasClaudeApiKey: !!claudeApiKey,
     };
+  },
+});
+
+// ============================================================================
+// TEST CLAUDE CONNECTION
+// ============================================================================
+
+export const testClaudeConnection = action({
+  args: {
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; message: string; error?: string }> => {
+    // Verify tenant access
+    await ctx.runQuery(api.tenants.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+    
+    const claudeApiKey: string | null = await ctx.runQuery(api.settings.get, { 
+      tenantId: args.tenantId,
+      userId: args.userId, 
+      key: 'claudeApiKey' 
+    });
+    
+    if (!claudeApiKey) {
+      return {
+        success: false,
+        message: 'Claude API Key not configured',
+        error: 'Please add your Claude API Key in Settings.',
+      };
+    }
+    
+    try {
+      // Test with a simple prompt
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeApiKey,
+          'anthropic-version': '2024-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 100,
+          messages: [
+            {
+              role: 'user',
+              content: 'Say "Hello" if you can read this.',
+            },
+          ],
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          message: `Claude API error: ${response.status}`,
+          error: errorText,
+        };
+      }
+      
+      const result = await response.json();
+      const content = result.content[0]?.text || '';
+      
+      return {
+        success: true,
+        message: 'Claude API is working!',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to connect to Claude API',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   },
 });
 

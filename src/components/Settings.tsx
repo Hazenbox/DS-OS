@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Moon, Sun, Monitor, Database, Key, Github, ExternalLink, Check, Loader2, Trash2, Figma, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { ThemeMode } from '../App';
@@ -80,6 +80,8 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     const [showClaudeKey, setShowClaudeKey] = useState(false);
     const [isClaudeSaving, setIsClaudeSaving] = useState(false);
     const [claudeSaved, setClaudeSaved] = useState(false);
+    const [isTestingClaude, setIsTestingClaude] = useState(false);
+    const [claudeTestResult, setClaudeTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     // Clear data
     const [isClearing, setIsClearing] = useState(false);
@@ -102,6 +104,7 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
     );
     const saveFigmaPat = useMutation(api.figma.setFigmaPat);
     const clearProjectData = useMutation(api.seed.clearProjectData);
+    const testClaude = useAction(api.claudeExtraction.testClaudeConnection);
 
     const handleThemeModeChange = async (mode: ThemeMode) => {
         onThemeModeChange(mode);
@@ -150,6 +153,24 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
             console.error('Failed to save Claude API key:', error);
         } finally {
             setIsClaudeSaving(false);
+        }
+    };
+
+    const handleTestClaude = async () => {
+        if (!effectiveTenantId || !effectiveUserId) return;
+        
+        setIsTestingClaude(true);
+        setClaudeTestResult(null);
+        try {
+            const result = await testClaude({ tenantId: effectiveTenantId, userId: effectiveUserId });
+            setClaudeTestResult(result);
+        } catch (error) {
+            setClaudeTestResult({
+                success: false,
+                message: error instanceof Error ? error.message : 'Unknown error',
+            });
+        } finally {
+            setIsTestingClaude(false);
         }
     };
 
@@ -322,7 +343,45 @@ export const Settings: React.FC<SettingsProps> = ({ themeMode, resolvedTheme, on
                                         ) : null}
                                         {claudeSaved ? 'Saved!' : 'Save'}
                                     </button>
+                                    {claudeKeyStatus && (
+                                        <button
+                                            onClick={handleTestClaude}
+                                            disabled={isTestingClaude || !effectiveTenantId || !effectiveUserId}
+                                            className="px-4 py-2 text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        >
+                                            {isTestingClaude ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Testing...
+                                                </>
+                                            ) : (
+                                                'Test Connection'
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
+                                {claudeTestResult && (
+                                    <div className={`mt-3 p-3 rounded-md flex items-start gap-2 ${
+                                        claudeTestResult.success 
+                                            ? 'bg-green-500/10 border border-green-500/20' 
+                                            : 'bg-red-500/10 border border-red-500/20'
+                                    }`}>
+                                        {claudeTestResult.success ? (
+                                            <Check size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                        ) : (
+                                            <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                                        )}
+                                        <div className="flex-1">
+                                            <p className={`text-sm ${
+                                                claudeTestResult.success 
+                                                    ? 'text-green-600 dark:text-green-400' 
+                                                    : 'text-red-600 dark:text-red-400'
+                                            }`}>
+                                                {claudeTestResult.message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 <a 
                                     href="https://console.anthropic.com/settings/keys" 
