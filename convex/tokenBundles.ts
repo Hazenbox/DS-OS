@@ -48,16 +48,17 @@ export const _getExistingBundle = internalQuery({
   args: {
     projectId: v.id("projects"),
     tenantId: v.id("tenants"),
-    type: v.union(v.literal("global"), v.literal("component")),
+    type: v.union(v.literal("global"), v.literal("semantic"), v.literal("component")),
     componentId: v.optional(v.id("components")),
   },
   handler: async (ctx, args) => {
-    if (args.type === "global") {
+    if (args.type === "global" || args.type === "semantic") {
       const bundles = await ctx.db
         .query("tokenBundles")
         .withIndex("by_project_type", (q) =>
-          q.eq("projectId", args.projectId).eq("type", "global")
+          q.eq("projectId", args.projectId).eq("type", args.type)
         )
+        .filter((q) => q.eq(q.field("tenantId"), args.tenantId))
         .collect();
       return bundles[0] || null;
     } else if (args.componentId) {
@@ -68,6 +69,23 @@ export const _getExistingBundle = internalQuery({
       return bundles[0] || null;
     }
     return null;
+  },
+});
+
+export const getSemanticBundle = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+  },
+  handler: async (ctx, args) => {
+    const bundles = await ctx.db
+      .query("tokenBundles")
+      .withIndex("by_project_type", (q) =>
+        q.eq("projectId", args.projectId).eq("type", "semantic")
+      )
+      .filter((q) => q.eq(q.field("tenantId"), args.tenantId))
+      .collect();
+    return bundles[0] || null;
   },
 });
 
@@ -104,7 +122,7 @@ export const _upsertBundle = internalMutation({
   args: {
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
-    type: v.union(v.literal("global"), v.literal("component")),
+    type: v.union(v.literal("global"), v.literal("semantic"), v.literal("component")),
     componentId: v.optional(v.id("components")),
     version: v.string(),
     cssContent: v.optional(v.string()),

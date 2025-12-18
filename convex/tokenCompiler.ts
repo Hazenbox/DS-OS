@@ -264,6 +264,170 @@ export const compileGlobalTheme = action({
 });
 
 // ============================================================================
+// COMPILE SEMANTIC TOKENS ACTION
+// ============================================================================
+
+export const compileSemanticTokens = action({
+  args: {
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<{
+    bundleId: Id<"tokenBundles">;
+    tokenCount: number;
+    cssSize: number;
+    jsonSize: number;
+  }> => {
+    console.log(`[TOKENS] Starting semantic token compilation for project ${args.projectId}`);
+
+    // Verify access
+    await ctx.runQuery(api.tenants.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+
+    // Get all tokens, filter for semantic layer
+    const allTokens = await ctx.runQuery(internal.tokenBundles._getProjectTokens, {
+      projectId: args.projectId,
+      tenantId: args.tenantId,
+    });
+
+    // Filter for semantic tokens only
+    const tokens = allTokens.filter((t: any) => t.layer === "semantic");
+    
+    if (tokens.length === 0) {
+      throw new Error("No semantic tokens found for this project");
+    }
+
+    console.log(`[TOKENS] Found ${tokens.length} semantic tokens`);
+
+    // Check for existing bundle
+    const existingBundle = await ctx.runQuery(internal.tokenBundles._getExistingBundle, {
+      projectId: args.projectId,
+      tenantId: args.tenantId,
+      type: "semantic",
+    });
+
+    // Generate version (increment if exists)
+    const version = existingBundle
+      ? `${existingBundle.version.split(".")[0]}.${parseInt(existingBundle.version.split(".")[1] || "0") + 1}`
+      : "1.0";
+
+    // Group tokens by type
+    const grouped = groupTokensByType(tokens);
+
+    // Generate JSON map
+    const jsonMap: Record<string, any> = {};
+    for (const token of tokens) {
+      const cssName = normalizeTokenName(token.name);
+      jsonMap[cssName] = {
+        name: token.name,
+        value: token.value,
+        type: token.type,
+        cssVar: `var(--${cssName})`,
+      };
+    }
+    const jsonContent = JSON.stringify(jsonMap, null, 2);
+
+    // Generate CSS with mode support
+    let finalCssContent: string;
+    const availableModes: string[] = [];
+
+    // Check if any tokens have multi-mode support
+    for (const token of tokens) {
+      if (token.valueByMode && typeof token.valueByMode === "object") {
+        const modes = Object.keys(token.valueByMode);
+        availableModes.push(...modes);
+      }
+    }
+
+    const uniqueModes = Array.from(new Set(availableModes));
+
+    if (uniqueModes.length === 0) {
+      // Single mode - simple CSS
+      const cssLines: string[] = [];
+      cssLines.push(":root {");
+      for (const token of tokens) {
+        cssLines.push(tokenToCSSVar(token.name, token.value));
+      }
+      cssLines.push("}");
+      finalCssContent = cssLines.join("\n");
+    } else {
+      // Multi-mode CSS
+      const modeCss: string[] = [];
+      
+      // Generate mode-specific CSS
+      for (const mode of uniqueModes) {
+        modeCss.push(`[data-theme="${mode}"] {`);
+        const modeTokens = tokens.filter((t: any) => t.valueByMode?.[mode]);
+        for (const token of modeTokens) {
+          const tokenValue = (token as any).valueByMode?.[mode] || token.value;
+          modeCss.push(tokenToCSSVar(token.name, tokenValue));
+        }
+        modeCss.push("}");
+        modeCss.push("");
+      }
+      
+      // Also include default :root for backward compatibility
+      modeCss.push(":root {");
+      for (const token of tokens) {
+        modeCss.push(tokenToCSSVar(token.name, token.value));
+      }
+      modeCss.push("}");
+      
+      finalCssContent = modeCss.join("\n");
+    }
+
+    // Upload to CDN (Vercel Blob Storage)
+    let cssUrl: string | undefined;
+    let jsonUrl: string | undefined;
+    
+    try {
+      const storageResult = await ctx.runAction(api.storage.uploadBundle, {
+        tenantId: args.tenantId,
+        projectId: args.projectId,
+        version,
+        type: "semantic",
+        cssContent: finalCssContent,
+        jsonContent,
+        modes: uniqueModes,
+      });
+      cssUrl = storageResult.cssUrl;
+      jsonUrl = storageResult.jsonUrl;
+      console.log(`[TOKENS] Uploaded semantic bundles to CDN: CSS=${cssUrl}, JSON=${jsonUrl}`);
+    } catch (error) {
+      console.error(`[TOKENS] Failed to upload to CDN, using DB fallback:`, error);
+      // Continue with DB storage as fallback
+    }
+
+    // Upsert the bundle (with CDN URLs if available)
+    const bundleId = await ctx.runMutation(internal.tokenBundles._upsertBundle, {
+      tenantId: args.tenantId,
+      projectId: args.projectId,
+      type: "semantic",
+      version,
+      cssContent: finalCssContent, // Keep for fallback
+      jsonContent, // Keep for fallback
+      cssUrl,
+      jsonUrl,
+      tokenCount: tokens.length,
+      modes: uniqueModes,
+      existingBundleId: existingBundle?._id,
+    });
+
+    console.log(`[TOKENS] Semantic token compilation complete. Bundle ID: ${bundleId}`);
+
+    return {
+      bundleId,
+      tokenCount: tokens.length,
+      cssSize: finalCssContent.length,
+      jsonSize: jsonContent.length,
+    };
+  },
+});
+
+// ============================================================================
 // GET GLOBAL BUNDLE QUERY
 // ============================================================================
 
@@ -493,6 +657,50 @@ export const getProjectBundle = action({
     });
 
     const bundle = await ctx.runQuery(internal.tokenBundles.getGlobalBundle, {
+      projectId: args.projectId,
+      tenantId: args.tenantId,
+    });
+
+    if (!bundle) {
+      return null;
+    }
+
+    return {
+      version: bundle.version,
+      cssContent: bundle.cssContent, // Fallback if CDN unavailable
+      jsonContent: bundle.jsonContent, // Fallback if CDN unavailable
+      cssUrl: bundle.cssUrl, // CDN URL (preferred)
+      jsonUrl: bundle.jsonUrl, // CDN URL (preferred)
+      tokenCount: bundle.tokenCount,
+      modes: bundle.modes || ['default'],
+      updatedAt: bundle.updatedAt,
+    };
+  },
+});
+
+export const getSemanticBundle = action({
+  args: {
+    projectId: v.id("projects"),
+    tenantId: v.id("tenants"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<{
+    version: string;
+    cssContent?: string;
+    jsonContent?: string;
+    cssUrl?: string;
+    jsonUrl?: string;
+    tokenCount: number;
+    modes: string[];
+    updatedAt: number;
+  } | null> => {
+    // Verify access
+    await ctx.runQuery(api.tenants.get, {
+      tenantId: args.tenantId,
+      userId: args.userId,
+    });
+
+    const bundle = await ctx.runQuery(internal.tokenBundles.getSemanticBundle, {
       projectId: args.projectId,
       tenantId: args.tenantId,
     });

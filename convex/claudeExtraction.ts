@@ -10,6 +10,9 @@ import { extractIML } from "./imlExtraction";
 import { generateComponentCode } from "./codeGenerator";
 import { normalizeTokenName, matchFigmaVarsToTokens, TokenMatch } from "./tokenCompiler";
 import { IRS, IRT, IML } from "../src/types/ir";
+import { validateIRS } from "./schemas/irsSchema";
+import { validateIRT } from "./schemas/irtSchema";
+import { validateIML } from "./schemas/imlSchema";
 
 // ============================================================================
 // TYPES
@@ -321,8 +324,8 @@ function resolveVariableValuesForMatching(
   
   for (const [modeId, value] of Object.entries(variable.valuesByMode || {})) {
     // Check if value is an alias
-    if (value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS' && value.id) {
-      const aliasId = value.id;
+    if (value && typeof value === 'object' && (value as any).type === 'VARIABLE_ALIAS' && (value as any).id) {
+      const aliasId = (value as any).id;
       
       // Prevent infinite loops
       if (visited.has(aliasId) || visited.size >= maxDepth) {
@@ -345,7 +348,7 @@ function resolveVariableValuesForMatching(
       const modeValue = referencedVar.valuesByMode?.[modeId] || Object.values(referencedVar.valuesByMode || {})[0];
       
       // Recursively resolve if it's also an alias
-      if (modeValue && typeof modeValue === 'object' && modeValue.type === 'VARIABLE_ALIAS') {
+      if (modeValue && typeof modeValue === 'object' && (modeValue as any).type === 'VARIABLE_ALIAS') {
         resolved[modeId] = resolveVariableValuesForMatching(referencedVar, allVariables, visited, maxDepth)[modeId] || modeValue;
       } else {
         resolved[modeId] = modeValue;
@@ -636,6 +639,13 @@ async function processExtractedData(
   // Step 3: Extract structure
   await updateProgress("extract_structure", "in_progress");
   const irs = extractIRS(nodeData, figmaUrl, fileKey);
+  // Validate IRS structure
+  try {
+    validateIRS(irs);
+  } catch (error) {
+    await updateProgress("extract_structure", "failed", error instanceof Error ? error.message : "IRS validation failed");
+    throw new Error(`IRS validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
   await updateProgress("extract_structure", "completed", `${irs.tree.length} nodes, ${irs.variants.length} variants`);
 
   // Step 4: Extract typography
@@ -666,12 +676,26 @@ async function processExtractedData(
   await updateProgress("extract_tokens", "in_progress");
   const allNodes = [nodeData, ...(nodeData.children || [])];
   const irt = extractIRT(variables, variableCollections, allNodes);
+  // Validate IRT structure
+  try {
+    validateIRT(irt);
+  } catch (error) {
+    await updateProgress("extract_tokens", "failed", error instanceof Error ? error.message : "IRT validation failed");
+    throw new Error(`IRT validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
   await updateProgress("extract_tokens", "completed", `${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
 
   // Step 10: Classify
   await updateProgress("classify", "in_progress");
   const componentIntelligence = classifyComponent(irs);
   const iml = extractIML(irs, componentIntelligence);
+  // Validate IML structure
+  try {
+    validateIML(iml);
+  } catch (error) {
+    await updateProgress("classify", "failed", error instanceof Error ? error.message : "IML validation failed");
+    throw new Error(`IML validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
   await updateProgress("classify", "completed", `${componentIntelligence.category} (${Math.round(componentIntelligence.confidence * 100)}% confidence)`);
 
   // Step 11: Get project tokens

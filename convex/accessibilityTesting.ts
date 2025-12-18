@@ -71,8 +71,12 @@ export const runAccessibilityTest = action({
     }
     
     // Get accessibility service URL from environment
+    // In production, this should be set to the deployed Vercel function URL
+    // For local development, use localhost; for production, use the deployed URL
     const accessibilityServiceUrl = process.env.ACCESSIBILITY_SERVICE_URL || 
-      'https://your-app.vercel.app/api/accessibility';
+      (process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}/api/accessibility`
+        : 'http://localhost:3000/api/accessibility');
     
     try {
       // Call Vercel serverless function for accessibility testing

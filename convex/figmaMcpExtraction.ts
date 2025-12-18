@@ -10,6 +10,9 @@ import { extractIML } from "./imlExtraction";
 import { generateComponentCode } from "./codeGenerator";
 import { matchFigmaVarsToTokens } from "./tokenCompiler";
 import { IRS, IRT, IML } from "../src/types/ir";
+import { validateIRS } from "./schemas/irsSchema";
+import { validateIRT } from "./schemas/irtSchema";
+import { validateIML } from "./schemas/imlSchema";
 
 // ============================================================================
 // TYPES
@@ -262,18 +265,39 @@ export const extractAndBuildComponentWithMCP = action({
       // Step 4: Extract structure
       await updateProgress("extract_structure", "in_progress");
       const irs = extractIRS(nodeData, args.figmaUrl, fileKey);
+      // Validate IRS structure
+      try {
+        validateIRS(irs);
+      } catch (error) {
+        await updateProgress("extract_structure", "failed", error instanceof Error ? error.message : "IRS validation failed");
+        throw new Error(`IRS validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
       await updateProgress("extract_structure", "completed", `${irs.tree.length} nodes, ${irs.variants.length} variants`);
 
       // Step 5: Extract tokens
       await updateProgress("extract_tokens", "in_progress");
       const allNodes = [nodeData, ...(nodeData.children || [])];
       const irt = extractIRT(variables, variableCollections, allNodes);
+      // Validate IRT structure
+      try {
+        validateIRT(irt);
+      } catch (error) {
+        await updateProgress("extract_tokens", "failed", error instanceof Error ? error.message : "IRT validation failed");
+        throw new Error(`IRT validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
       await updateProgress("extract_tokens", "completed", `${irt.tokens.length} tokens, ${Object.keys(irt.modeValues).length} modes`);
 
       // Step 6: Classify
       await updateProgress("classify", "in_progress");
       const componentIntelligence = classifyComponent(irs);
       const iml = extractIML(irs, componentIntelligence);
+      // Validate IML structure
+      try {
+        validateIML(iml);
+      } catch (error) {
+        await updateProgress("classify", "failed", error instanceof Error ? error.message : "IML validation failed");
+        throw new Error(`IML validation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
       await updateProgress("classify", "completed", `${componentIntelligence.category} (${Math.round(componentIntelligence.confidence * 100)}% confidence)`);
 
       // Step 7: Get project tokens

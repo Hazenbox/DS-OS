@@ -253,6 +253,11 @@ export default defineSchema({
       v.literal("blur"),
       v.literal("unknown")
     ),
+    layer: v.optional(v.union(
+      v.literal("global"),
+      v.literal("semantic"),
+      v.literal("component")
+    )), // Token layer: global (rarely change), semantic (medium churn), component (high churn)
     description: v.optional(v.string()),
     brand: v.optional(v.string()),
     sourceFileId: v.optional(v.id("tokenFiles")), // Link to source file
@@ -270,7 +275,7 @@ export default defineSchema({
   tokenBundles: defineTable({
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
-    type: v.union(v.literal("global"), v.literal("component")),
+    type: v.union(v.literal("global"), v.literal("semantic"), v.literal("component")),
     componentId: v.optional(v.id("components")), // For component bundles
     version: v.string(),
     cssContent: v.optional(v.string()), // CSS with :root variables (fallback, prefer CDN)

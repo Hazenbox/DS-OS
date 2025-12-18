@@ -18,7 +18,7 @@ export const uploadBundle = action({
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
     version: v.string(),
-    type: v.union(v.literal("global"), v.literal("component")),
+    type: v.union(v.literal("global"), v.literal("semantic"), v.literal("component")),
     componentId: v.optional(v.id("components")),
     cssContent: v.optional(v.string()),
     jsonContent: v.string(),
@@ -153,7 +153,7 @@ export const checkBundleExists = action({
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
     version: v.string(),
-    type: v.union(v.literal("global"), v.literal("component")),
+    type: v.union(v.literal("global"), v.literal("semantic"), v.literal("component")),
     componentId: v.optional(v.id("components")),
   },
   handler: async (ctx, args): Promise<boolean> => {

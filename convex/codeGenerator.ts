@@ -86,6 +86,9 @@ function generateTypes(componentName: string, irs: IRS, iml: IML): string {
     }
   }
   
+  // Add token override props
+  props += `  tokenOverrides?: Record<string, string | number>; // Runtime token overrides\n`;
+  
   // Add common props
   props += `  className?: string;\n`;
   props += `  children?: React.ReactNode;\n`;
@@ -154,10 +157,20 @@ function generateComponent(
   const variantProps = extractVariantProps(irs);
   const slotProps = irs.slots.map(s => s.name);
   // Deduplicate props to avoid "Argument name clash" errors
-  const allPropsSet = new Set([...variantProps, ...slotProps, 'className', 'children', 'onClick', 'onFocus', 'onBlur']);
+  const allPropsSet = new Set([...variantProps, ...slotProps, 'tokenOverrides', 'className', 'children', 'onClick', 'onFocus', 'onBlur']);
   const allProps = Array.from(allPropsSet);
   component += `  ${allProps.join(',\n  ')},\n`;
   component += `}) => {\n`;
+  
+  // Generate token override CSS variables
+  component += `  // Apply token overrides as CSS variables\n`;
+  component += `  const overrideStyles = tokenOverrides ? {\n`;
+  component += `    ...Object.entries(tokenOverrides).reduce((acc, [key, value]) => {\n`;
+  component += `      const cssVarName = key.startsWith('--') ? key : \`--\${key.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}\`;\n`;
+  component += `      acc[cssVarName] = typeof value === 'number' ? \`\${value}px\` : String(value);\n`;
+  component += `      return acc;\n`;
+  component += `    }, {} as Record<string, string>)\n`;
+  component += `  } : {};\n\n`;
   
   // Generate state management if needed
   if (iml.states.length > 1) {
@@ -235,6 +248,7 @@ function generateButtonComponent(
   let code = `  return (\n`;
   code += `    <button\n`;
   code += `      className={componentClassName}\n`;
+  code += `      style={overrideStyles}\n`;
   code += `      ${ariaAttrs}\n`;
   
   // Add event handlers
@@ -356,6 +370,7 @@ function generateInputComponent(
   
   code += `      <input\n`;
   code += `        className={componentClassName}\n`;
+  code += `        style={overrideStyles}\n`;
   code += `        ${ariaAttrs}\n`;
   
   for (const interaction of iml.interactions) {
@@ -400,7 +415,7 @@ function generateComboboxComponent(
   code += `  const [value, setValue] = React.useState<string>('');\n\n`;
   code += `  return (\n`;
   code += `    <Combobox.Root open={open} onOpenChange={setOpen}>\n`;
-  code += `      <Combobox.Trigger className={componentClassName} ${ariaAttrs}>\n`;
+  code += `      <Combobox.Trigger className={componentClassName} style={overrideStyles} ${ariaAttrs}>\n`;
   code += `        {value || 'Select...'}\n`;
   code += `      </Combobox.Trigger>\n`;
   code += `      <Combobox.Content className="${componentName.toLowerCase()}__content">\n`;
@@ -426,7 +441,7 @@ function generateDialogComponent(
   let code = `  const [open, setOpen] = React.useState(false);\n\n`;
   code += `  return (\n`;
   code += `    <Dialog.Root open={open} onOpenChange={setOpen}>\n`;
-  code += `      <Dialog.Trigger className={componentClassName}>\n`;
+  code += `      <Dialog.Trigger className={componentClassName} style={overrideStyles}>\n`;
   code += `        {children}\n`;
   code += `      </Dialog.Trigger>\n`;
   code += `      <Dialog.Portal>\n`;
@@ -468,6 +483,7 @@ function generateGenericComponent(
   let code = `  return (\n`;
   code += `    <div\n`;
   code += `      className={componentClassName}\n`;
+  code += `      style={overrideStyles}\n`;
   code += `      ${ariaAttrs}\n`;
   code += `    >\n`;
   
